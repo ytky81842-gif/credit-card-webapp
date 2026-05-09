@@ -198,22 +198,31 @@ function setupSyncButton() {
         throw new Error(responseJson?.message || `送信に失敗しました: HTTP ${response.status}`);
       }
 
-      const importResults = responseJson.import_results || {};
-      const detailCount = Number(importResults.details?.imported || 0);
-      const supportCount = Number(importResults.supports?.imported || 0);
-      const reserveCount = Number(importResults.reserves?.imported || 0);
+      await markPayloadAsSynced(exportData);
 
-      const skippedDetailCount = Number(importResults.details?.skipped || 0);
-      const skippedSupportCount = Number(importResults.supports?.skipped || 0);
-      const skippedReserveCount = Number(importResults.reserves?.skipped || 0);
+      const importResults = responseJson.import_results || {};
+      const detailImported = Number(importResults.details?.imported || 0);
+      const supportImported = Number(importResults.supports?.imported || 0);
+      const reserveImported = Number(importResults.reserves?.imported || 0);
+
+      const detailSkipped = Number(importResults.details?.skipped || 0);
+      const supportSkipped = Number(importResults.supports?.skipped || 0);
+      const reserveSkipped = Number(importResults.reserves?.skipped || 0);
+
+      await refreshHomeAndUnsyncedView();
+      await renderSupportTargetOptions();
+      await renderReserveTargetOptions();
+      await renderMonthlyTargetMonthOptions();
+      await renderMonthlySummary();
 
       statusElement.textContent =
-        `送信成功: 明細${detailCount}件 / 支援金${supportCount}件 / 準備金${reserveCount}件`;
+        `同期完了: 取込 明細${detailImported}件 / 支援金${supportImported}件 / 準備金${reserveImported}件`;
 
       alert(
-        `Macへ送信しました。\n` +
-          `取込: 明細 ${detailCount}件 / 支援金 ${supportCount}件 / 準備金 ${reserveCount}件\n` +
-          `スキップ: 明細 ${skippedDetailCount}件 / 支援金 ${skippedSupportCount}件 / 準備金 ${skippedReserveCount}件`
+        `同期完了\n` +
+          `取込: 明細 ${detailImported}件 / 支援金 ${supportImported}件 / 準備金 ${reserveImported}件\n` +
+          `スキップ: 明細 ${detailSkipped}件 / 支援金 ${supportSkipped}件 / 準備金 ${reserveSkipped}件\n` +
+          `送信対象は同期済みに更新しました。`
       );
     } catch (error) {
       console.error("同期送信エラー:", error);
@@ -222,6 +231,63 @@ function setupSyncButton() {
     } finally {
       syncButton.disabled = false;
     }
+  });
+}
+
+async function markPayloadAsSynced(exportData) {
+  const detailIds = (exportData.details || []).map((item) => item.detail_id).filter(Boolean);
+  const supportIds = (exportData.supports || []).map((item) => item.support_id).filter(Boolean);
+  const reserveIds = (exportData.reserves || []).map((item) => item.reserve_id).filter(Boolean);
+
+  await markStoreRecordsAsSynced(DETAIL_STORE, "detail_id", detailIds);
+  await markStoreRecordsAsSynced(SUPPORT_STORE, "support_id", supportIds);
+  await markStoreRecordsAsSynced(RESERVE_STORE, "reserve_id", reserveIds);
+}
+
+function markStoreRecordsAsSynced(storeName, keyName, targetIds) {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+      reject(new Error(`DBが初期化されていません: ${storeName}`));
+      return;
+    }
+
+    if (!Array.isArray(targetIds) || targetIds.length === 0) {
+      resolve();
+      return;
+    }
+
+    const targetIdSet = new Set(targetIds);
+    const transaction = db.transaction([storeName], "readwrite");
+    const store = transaction.objectStore(storeName);
+    const request = store.openCursor();
+
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+
+      if (cursor) {
+        const record = cursor.value;
+        const recordId = String(record[keyName] || "");
+
+        if (targetIdSet.has(recordId)) {
+          record.synced = true;
+          cursor.update(record);
+        }
+
+        cursor.continue();
+      }
+    };
+
+    request.onerror = () => {
+      reject(new Error(`${storeName} の同期済み更新に失敗しました。`));
+    };
+
+    transaction.oncomplete = () => {
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      reject(new Error(`${storeName} の同期済み更新トランザクションに失敗しました。`));
+    };
   });
 }
 
