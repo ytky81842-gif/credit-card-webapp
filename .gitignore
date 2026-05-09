@@ -1,0 +1,8 @@
+*.xlsx
+*.xlsm
+*.json
+*.py
+backups/
+incoming/
+__pycache__/
+.DS_Store

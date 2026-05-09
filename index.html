@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>クレジットカード管理アプリ</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <h1>クレジットカード管理アプリ</h1>
+        <p class="sub-text">iPhone入力・Mac管理用の初期画面</p>
+      </header>
+
+      <main class="main-content">
+        <section id="home-view" class="view active-view">
+          <div class="card">
+            <h2>ホーム</h2>
+            <p>ここから各入力画面と閲覧画面へ移動します。</p>
+
+            <div class="status-box">
+              <div>
+                <span class="label">未同期明細</span>
+                <span id="unsynced-detail-count" class="value">0</span>
+              </div>
+              <div>
+                <span class="label">未同期支援金</span>
+                <span id="unsynced-support-count" class="value">0</span>
+              </div>
+              <div>
+                <span class="label">未同期準備金</span>
+                <span id="unsynced-reserve-count" class="value">0</span>
+              </div>
+            </div>
+
+            <div class="menu-grid">
+              <button class="menu-button" data-view="detail-view">通常利用入力</button>
+              <button class="menu-button" data-view="support-view">支援金入力</button>
+              <button class="menu-button" data-view="reserve-view">カード準備金入力</button>
+              <button class="menu-button" data-view="monthly-view">月次閲覧</button>
+              <button class="menu-button" data-view="unsynced-view">未同期データ確認</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="detail-view" class="view">
+          <div class="card">
+            <div class="section-header">
+              <h2>通常利用入力</h2>
+              <button class="back-button" data-view="home-view">ホームへ戻る</button>
+            </div>
+
+            <form id="detail-form" class="form-grid">
+              <label>
+                <span>利用日</span>
+                <input type="date" name="useDate" />
+              </label>
+
+              <label>
+                <span>利用金額</span>
+                <input type="text" inputmode="numeric" name="amount" data-money-input="true" placeholder="例: 1200" />
+              </label>
+
+              <label>
+                <span>利用用途</span>
+                <input type="text" name="purpose" placeholder="例: ローソン" />
+              </label>
+
+              <label>
+                <span>予算分類</span>
+                <select name="budgetCategory">
+                  <option value="">選択してください</option>
+                </select>
+              </label>
+
+              <label>
+                <span>利用カード</span>
+                <select name="cardName">
+                  <option value="">選択してください</option>
+                </select>
+              </label>
+
+              <label class="full-width">
+                <span>備考</span>
+                <textarea name="note" rows="3" placeholder="必要なら入力"></textarea>
+              </label>
+
+              <button type="submit" class="primary-button">通常利用を保存</button>
+            </form>
+          </div>
+        </section>
+
+        <section id="support-view" class="view">
+          <div class="card">
+            <div class="section-header">
+              <h2>支援金入力</h2>
+              <button class="back-button" data-view="home-view">ホームへ戻る</button>
+            </div>
+
+            <form id="support-form" class="form-grid">
+              <label class="full-width">
+                <span>対象明細</span>
+                <select name="targetDetail">
+                  <option value="">読み込み中...</option>
+                </select>
+              </label>
+
+              <label>
+                <span>支援金額</span>
+                <input type="text" inputmode="numeric" name="supportAmount" data-money-input="true" placeholder="例: 3000" />
+              </label>
+
+              <label>
+                <span>登録日</span>
+                <input type="date" name="supportDate" />
+              </label>
+
+              <label class="full-width">
+                <span>メモ</span>
+                <textarea name="supportNote" rows="3" placeholder="必要なら入力"></textarea>
+              </label>
+
+              <button type="submit" class="primary-button">支援金を保存</button>
+            </form>
+          </div>
+        </section>
+
+        <section id="reserve-view" class="view">
+          <div class="card">
+            <div class="section-header">
+              <h2>カード準備金入力</h2>
+              <button class="back-button" data-view="home-view">ホームへ戻る</button>
+            </div>
+
+            <form id="reserve-form" class="form-grid">
+              <label class="full-width">
+                <span>対象明細</span>
+                <select name="targetReserveDetail">
+                  <option value="">読み込み中...</option>
+                </select>
+              </label>
+
+              <label>
+                <span>準備金額</span>
+                <input type="text" inputmode="numeric" name="reserveAmount" data-money-input="true" placeholder="例: 10000" />
+              </label>
+
+              <label>
+                <span>登録日</span>
+                <input type="date" name="reserveDate" />
+              </label>
+
+              <label class="full-width">
+                <span>メモ</span>
+                <textarea name="reserveNote" rows="3" placeholder="必要なら入力"></textarea>
+              </label>
+
+              <button type="submit" class="primary-button">準備金を保存</button>
+            </form>
+          </div>
+        </section>
+
+        <section id="monthly-view" class="view">
+          <div class="card">
+            <div class="section-header">
+              <h2>月次閲覧</h2>
+              <button class="back-button" data-view="home-view">ホームへ戻る</button>
+            </div>
+
+            <div class="form-grid monthly-filter">
+              <label>
+                <span>対象月</span>
+                <select id="monthly-target-month">
+                  <option value="">読み込み中...</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span>明細合計</span>
+                <strong id="monthly-total-detail">¥0</strong>
+              </div>
+              <div class="summary-item">
+                <span>支援計</span>
+                <strong id="monthly-total-support">¥0</strong>
+              </div>
+              <div class="summary-item">
+                <span>準備金計</span>
+                <strong id="monthly-total-reserve">¥0</strong>
+              </div>
+              <div class="summary-item">
+                <span>差引確認値</span>
+                <strong id="monthly-net-check">¥0</strong>
+              </div>
+            </div>
+
+            <div class="count-grid">
+              <div class="count-item">
+                <span>明細件数</span>
+                <strong id="monthly-detail-count">0</strong>
+              </div>
+              <div class="count-item">
+                <span>支援金件数</span>
+                <strong id="monthly-support-count">0</strong>
+              </div>
+              <div class="count-item">
+                <span>準備金件数</span>
+                <strong id="monthly-reserve-count">0</strong>
+              </div>
+            </div>
+
+            <div class="monthly-block">
+              <h3>カード別請求額（仮）</h3>
+              <div id="monthly-card-breakdown" class="monthly-list">
+                <p class="empty-message">対象月のカード利用はありません。</p>
+              </div>
+            </div>
+
+            <div class="monthly-block">
+              <h3>予算分類別集計（仮）</h3>
+              <div id="monthly-budget-breakdown" class="monthly-list">
+                <p class="empty-message">対象月の分類別データはありません。</p>
+              </div>
+            </div>
+
+            <div class="monthly-block">
+              <h3>支援金一覧</h3>
+              <div id="monthly-support-list" class="monthly-list">
+                <p class="empty-message">対象月の支援金はありません。</p>
+              </div>
+            </div>
+
+            <div class="monthly-block">
+              <h3>準備金一覧</h3>
+              <div id="monthly-reserve-list" class="monthly-list">
+                <p class="empty-message">対象月の準備金はありません。</p>
+              </div>
+            </div>
+
+            <div class="monthly-note">
+              <p>※ 現時点ではローカル保存データによる仮集計です。</p>
+              <p>※ カード別請求額は通常利用明細のみを集計しています。固定費はまだ加算していません。</p>
+              <p>※ 予算分類別集計は通常利用明細のみを集計しています。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="unsynced-view" class="view">
+          <div class="card">
+            <div class="section-header">
+              <h2>未同期データ確認</h2>
+              <button class="back-button" data-view="home-view">ホームへ戻る</button>
+            </div>
+
+            <div class="sync-settings-block">
+              <h3>同期設定</h3>
+              <div class="form-grid">
+                <label class="full-width">
+                  <span>同期先URL</span>
+                  <input
+                    type="text"
+                    id="sync-base-url"
+                    placeholder="例: http://192.168.1.8:8765"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                  />
+                </label>
+                <button type="button" id="save-sync-url-button" class="secondary-button">同期先URLを保存</button>
+                <button type="button" id="sync-button" class="primary-button">Macへ同期する</button>
+              </div>
+              <p id="sync-url-status" class="helper-text">同期先URLを保存すると次回も保持されます。</p>
+            </div>
+
+            <p class="placeholder-text">未同期の通常利用明細を確認できます。</p>
+
+            <div class="unsynced-block">
+              <h3>未同期明細一覧</h3>
+              <div id="unsynced-detail-list" class="record-list">
+                <p class="empty-message">未同期明細はありません。</p>
+              </div>
+            </div>
+
+            <button type="button" id="export-json-button" class="secondary-button">未同期データをJSONで書き出す</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
