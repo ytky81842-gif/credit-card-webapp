@@ -198,16 +198,22 @@ function setupSyncButton() {
         throw new Error(responseJson?.message || `送信に失敗しました: HTTP ${response.status}`);
       }
 
-      const counts = responseJson.counts || {};
-      const detailCount = Number(counts.details || 0);
-      const supportCount = Number(counts.supports || 0);
-      const reserveCount = Number(counts.reserves || 0);
+      const importResults = responseJson.import_results || {};
+      const detailCount = Number(importResults.details?.imported || 0);
+      const supportCount = Number(importResults.supports?.imported || 0);
+      const reserveCount = Number(importResults.reserves?.imported || 0);
+
+      const skippedDetailCount = Number(importResults.details?.skipped || 0);
+      const skippedSupportCount = Number(importResults.supports?.skipped || 0);
+      const skippedReserveCount = Number(importResults.reserves?.skipped || 0);
 
       statusElement.textContent =
         `送信成功: 明細${detailCount}件 / 支援金${supportCount}件 / 準備金${reserveCount}件`;
 
       alert(
-        `Macへ送信しました。\n明細: ${detailCount}件\n支援金: ${supportCount}件\n準備金: ${reserveCount}件`
+        `Macへ送信しました。\n` +
+          `取込: 明細 ${detailCount}件 / 支援金 ${supportCount}件 / 準備金 ${reserveCount}件\n` +
+          `スキップ: 明細 ${skippedDetailCount}件 / 支援金 ${skippedSupportCount}件 / 準備金 ${skippedReserveCount}件`
       );
     } catch (error) {
       console.error("同期送信エラー:", error);
