@@ -152,6 +152,10 @@ button:disabled {
   gap: 14px;
 }
 
+.form-grid > * {
+  min-width: 0;
+}
+
 .form-grid label {
   display: grid;
   gap: 6px;
@@ -166,21 +170,37 @@ button:disabled {
 input,
 select,
 textarea {
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 12px;
-  font-size: 1rem;
+  font-size: 16px;
   background: #fff;
 }
 
 input[type="date"] {
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 12px;
+  overflow: hidden;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding: 0;
 }
 
 textarea {
