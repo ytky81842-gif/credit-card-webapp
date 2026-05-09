@@ -235,58 +235,43 @@ function setupSyncButton() {
 }
 
 async function markPayloadAsSynced(exportData) {
-  const detailIds = (exportData.details || []).map((item) => item.detail_id).filter(Boolean);
-  const supportIds = (exportData.supports || []).map((item) => item.support_id).filter(Boolean);
-  const reserveIds = (exportData.reserves || []).map((item) => item.reserve_id).filter(Boolean);
-
-  await markStoreRecordsAsSynced(DETAIL_STORE, "detail_id", detailIds);
-  await markStoreRecordsAsSynced(SUPPORT_STORE, "support_id", supportIds);
-  await markStoreRecordsAsSynced(RESERVE_STORE, "reserve_id", reserveIds);
+  await markRecordsAsSynced(DETAIL_STORE, exportData.details || []);
+  await markRecordsAsSynced(SUPPORT_STORE, exportData.supports || []);
+  await markRecordsAsSynced(RESERVE_STORE, exportData.reserves || []);
 }
 
-function markStoreRecordsAsSynced(storeName, keyName, targetIds) {
+function markRecordsAsSynced(storeName, records) {
   return new Promise((resolve, reject) => {
     if (!db) {
       reject(new Error(`DBが初期化されていません: ${storeName}`));
       return;
     }
 
-    if (!Array.isArray(targetIds) || targetIds.length === 0) {
+    if (!Array.isArray(records) || records.length === 0) {
       resolve();
       return;
     }
 
-    const targetIdSet = new Set(targetIds);
     const transaction = db.transaction([storeName], "readwrite");
     const store = transaction.objectStore(storeName);
-    const request = store.openCursor();
 
-    request.onsuccess = (event) => {
-      const cursor = event.target.result;
-
-      if (cursor) {
-        const record = cursor.value;
-        const recordId = String(record[keyName] || "");
-
-        if (targetIdSet.has(recordId)) {
-          record.synced = true;
-          cursor.update(record);
-        }
-
-        cursor.continue();
+    records.forEach((record) => {
+      if (!record) {
+        return;
       }
-    };
-
-    request.onerror = () => {
-      reject(new Error(`${storeName} の同期済み更新に失敗しました。`));
-    };
+      const updatedRecord = {
+        ...record,
+        synced: true,
+      };
+      store.put(updatedRecord);
+    });
 
     transaction.oncomplete = () => {
       resolve();
     };
 
     transaction.onerror = () => {
-      reject(new Error(`${storeName} の同期済み更新トランザクションに失敗しました。`));
+      reject(new Error(`${storeName} の同期済み更新に失敗しました。`));
     };
   });
 }
