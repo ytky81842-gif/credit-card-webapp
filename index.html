@@ -221,6 +221,16 @@
             </div>
 
             <div class="monthly-block">
+              <h3>元データ残額</h3>
+              <div class="monthly-list">
+                <div class="monthly-row">
+                  <span class="monthly-row-label">残額</span>
+                  <span id="monthly-source-balance" class="monthly-row-value">未取得</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="monthly-block">
               <h3>カード別請求額（仮）</h3>
               <div id="monthly-card-breakdown" class="monthly-list">
                 <p class="empty-message">対象月のカード利用はありません。</p>
@@ -250,8 +260,7 @@
 
             <div class="monthly-note">
               <p>※ 現時点ではローカル保存データによる仮集計です。</p>
-              <p>※ カード別請求額は通常利用明細のみを集計しています。固定費はまだ加算していません。</p>
-              <p>※ 予算分類別集計は通常利用明細のみを集計しています。</p>
+              <p>※ 元データ残額は次工程でExcel参照に接続します。</p>
             </div>
           </div>
         </section>
@@ -299,6 +308,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=20260510a"></script>
+    <script src="app.js?v=20260510c"></script>
   </body>
 </html>
