@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>クレジットカード管理アプリ</title>
-    <link rel="stylesheet" href="style.css?v=20260510b" />
+    <link rel="stylesheet" href="style.css?v=20260510d" />
   </head>
   <body>
     <div class="app-shell">
@@ -200,8 +200,8 @@
                 <strong id="monthly-total-reserve">¥0</strong>
               </div>
               <div class="summary-item">
-                <span>差引確認値</span>
-                <strong id="monthly-net-check">¥0</strong>
+                <span>残額</span>
+                <strong id="monthly-balance">未取得</strong>
               </div>
             </div>
 
@@ -217,16 +217,6 @@
               <div class="count-item">
                 <span>準備金件数</span>
                 <strong id="monthly-reserve-count">0</strong>
-              </div>
-            </div>
-
-            <div class="monthly-block">
-              <h3>元データ残額</h3>
-              <div class="monthly-list">
-                <div class="monthly-row">
-                  <span class="monthly-row-label">残額</span>
-                  <span id="monthly-source-balance" class="monthly-row-value">未取得</span>
-                </div>
               </div>
             </div>
 
@@ -259,8 +249,8 @@
             </div>
 
             <div class="monthly-note">
-              <p>※ 現時点ではローカル保存データによる仮集計です。</p>
-              <p>※ 元データ残額は次工程でExcel参照に接続します。</p>
+              <p>※ 現時点では一部がローカル保存データによる仮集計です。</p>
+              <p>※ 残額は次工程で元データExcel参照に接続します。</p>
             </div>
           </div>
         </section>
@@ -308,6 +298,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=20260510c"></script>
+    <script src="app.js?v=20260510d"></script>
   </body>
 </html>
