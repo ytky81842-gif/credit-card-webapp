@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>クレジットカード管理アプリ</title>
-    <link rel="stylesheet" href="style.css?v=20260510a" />
+    <link rel="stylesheet" href="style.css?v=20260510b" />
   </head>
   <body>
     <div class="app-shell">
@@ -52,9 +52,12 @@
             </div>
 
             <form id="detail-form" class="form-grid">
-              <label class="date-field">
+              <label>
                 <span>利用日</span>
-                <input type="date" name="useDate" />
+                <div class="date-ui-box">
+                  <span id="detail-date-display" class="date-ui-text placeholder">日付を選択してください</span>
+                  <input type="date" id="detail-date-input" name="useDate" class="date-ui-input" />
+                </div>
               </label>
 
               <label>
@@ -111,9 +114,12 @@
                 <input type="text" inputmode="numeric" name="supportAmount" data-money-input="true" placeholder="例: 3000" />
               </label>
 
-              <label class="date-field">
+              <label>
                 <span>登録日</span>
-                <input type="date" name="supportDate" />
+                <div class="date-ui-box">
+                  <span id="support-date-display" class="date-ui-text placeholder">日付を選択してください</span>
+                  <input type="date" id="support-date-input" name="supportDate" class="date-ui-input" />
+                </div>
               </label>
 
               <label class="full-width">
@@ -146,9 +152,12 @@
                 <input type="text" inputmode="numeric" name="reserveAmount" data-money-input="true" placeholder="例: 10000" />
               </label>
 
-              <label class="date-field">
+              <label>
                 <span>登録日</span>
-                <input type="date" name="reserveDate" />
+                <div class="date-ui-box">
+                  <span id="reserve-date-display" class="date-ui-text placeholder">日付を選択してください</span>
+                  <input type="date" id="reserve-date-input" name="reserveDate" class="date-ui-input" />
+                </div>
               </label>
 
               <label class="full-width">

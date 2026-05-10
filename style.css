@@ -10,7 +10,6 @@
   --sub: #6b7280;
   --accent: #1d4ed8;
   --accent-dark: #1e3a8a;
-  --danger: #dc2626;
 }
 
 body {
@@ -182,55 +181,42 @@ textarea {
   background: #fff;
 }
 
-input[type="date"] {
+.date-ui-box {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  min-height: 50px;
+  overflow: hidden;
+}
+
+.date-ui-text {
   display: block;
   width: 100%;
-  max-width: 100%;
   min-width: 0;
-  inline-size: 100%;
-  max-inline-size: 100%;
-  min-inline-size: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--text);
   white-space: nowrap;
-  padding: 12px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-input[type="date"]::-webkit-date-and-time-value {
-  min-width: 0;
+.date-ui-text.placeholder {
+  color: #9ca3af;
+}
+
+.date-ui-input {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  text-align: left;
-}
-
-input[type="date"]::-webkit-datetime-edit {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  padding: 0;
-}
-
-input[type="date"]::-webkit-datetime-edit-fields-wrapper {
-  display: inline-flex;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-input[type="date"]::-webkit-datetime-edit-text,
-input[type="date"]::-webkit-datetime-edit-month-field,
-input[type="date"]::-webkit-datetime-edit-day-field,
-input[type="date"]::-webkit-datetime-edit-year-field {
-  min-width: 0;
-  padding: 0;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0;
+  height: 100%;
+  opacity: 0.01;
+  cursor: pointer;
+  border: none;
+  background: transparent;
 }
 
 textarea {

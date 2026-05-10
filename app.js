@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     populateMasterOptions();
     setupMoneyInputNormalization();
     setupSyncSettings();
+    setupDateUiFields();
     await initializeDatabase();
     setupDetailForm();
     setupSupportForm();
@@ -33,6 +34,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     alert(`初期化失敗: ${error.message}`);
   }
 });
+
+function setupDateUiFields() {
+  bindDateUi("detail-date-input", "detail-date-display");
+  bindDateUi("support-date-input", "support-date-display");
+  bindDateUi("reserve-date-input", "reserve-date-display");
+}
+
+function bindDateUi(inputId, displayId) {
+  const input = document.getElementById(inputId);
+  const display = document.getElementById(displayId);
+
+  if (!input || !display) {
+    return;
+  }
+
+  const refresh = () => {
+    if (input.value) {
+      display.textContent = formatDisplayDate(input.value);
+      display.classList.remove("placeholder");
+    } else {
+      display.textContent = "日付を選択してください";
+      display.classList.add("placeholder");
+    }
+  };
+
+  input.addEventListener("change", refresh);
+  refresh();
+}
+
+function formatDisplayDate(value) {
+  const parts = String(value).split("-");
+  if (parts.length !== 3) {
+    return value;
+  }
+  return `${parts[0]}/${parts[1]}/${parts[2]}`;
+}
 
 function setupViewNavigation() {
   const buttons = document.querySelectorAll("[data-view]");
@@ -377,6 +414,7 @@ function setupDetailForm() {
 
       await saveDetailRecord(detailRecord);
       detailForm.reset();
+      syncDateUiReset("detail-date-input", "detail-date-display");
       await refreshHomeAndUnsyncedView();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
@@ -432,6 +470,7 @@ function setupSupportForm() {
 
       await saveSupportRecord(supportRecord);
       supportForm.reset();
+      syncDateUiReset("support-date-input", "support-date-display");
       await refreshHomeAndUnsyncedView();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
@@ -487,6 +526,7 @@ function setupReserveForm() {
 
       await saveReserveRecord(reserveRecord);
       reserveForm.reset();
+      syncDateUiReset("reserve-date-input", "reserve-date-display");
       await refreshHomeAndUnsyncedView();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
@@ -499,6 +539,19 @@ function setupReserveForm() {
       alert(`保存失敗の詳細: ${error.message}`);
     }
   });
+}
+
+function syncDateUiReset(inputId, displayId) {
+  const input = document.getElementById(inputId);
+  const display = document.getElementById(displayId);
+
+  if (!input || !display) {
+    return;
+  }
+
+  input.value = "";
+  display.textContent = "日付を選択してください";
+  display.classList.add("placeholder");
 }
 
 function setupExportButton() {
