@@ -4,7 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>クレジットカード管理アプリ</title>
-    <link rel="stylesheet" href="style.css?v=20260510e" />
+    <script>
+      (function () {
+        const CURRENT_VERSION = "20260510f";
+        const url = new URL(window.location.href);
+        const currentVersion = url.searchParams.get("v");
+
+        if (currentVersion !== CURRENT_VERSION) {
+          url.searchParams.set("v", CURRENT_VERSION);
+          window.location.replace(url.toString());
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="style.css?v=20260510f" />
   </head>
   <body>
     <div class="app-shell">
