@@ -286,6 +286,32 @@ function markRecordsAsSynced(storeName, records) {
   });
 }
 
+async function fetchMonthlyBalance(targetMonth) {
+  const savedUrl = loadSavedSyncBaseUrl();
+  if (!savedUrl) return "未取得";
+
+  try {
+    const response = await fetch(
+      `${savedUrl}/balance?month=${encodeURIComponent(targetMonth)}`
+    );
+    const responseJson = await response.json();
+
+    if (!response.ok || !responseJson?.ok) {
+      return "未取得";
+    }
+
+    const balanceValue = responseJson.balance;
+    if (balanceValue === null || balanceValue === undefined || balanceValue === "") {
+      return "未取得";
+    }
+
+    return formatCurrency(balanceValue);
+  } catch (error) {
+    console.error("残額取得エラー:", error);
+    return "未取得";
+  }
+}
+
 function normalizeMoneyInput(value) {
   const halfWidthValue = String(value)
     .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 65248))
@@ -699,7 +725,9 @@ async function renderMonthlySummary() {
   renderMonthlySupportList(targetMonthSupports);
   renderMonthlyReserveList(targetMonthReserves);
 
-  if (balanceElement) balanceElement.textContent = "未取得";
+  if (balanceElement) {
+    balanceElement.textContent = await fetchMonthlyBalance(targetMonth);
+  }
 }
 
 function buildCardBreakdown(detailRecords) {
