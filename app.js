@@ -312,6 +312,25 @@ async function fetchMonthlyBalance(targetMonth) {
   }
 }
 
+async function fetchMonthlyOptions() {
+  const savedUrl = loadSavedSyncBaseUrl();
+  if (!savedUrl) return [];
+
+  try {
+    const response = await fetch(`${savedUrl}/months`);
+    const responseJson = await response.json();
+
+    if (!response.ok || !responseJson?.ok || !Array.isArray(responseJson.months)) {
+      return [];
+    }
+
+    return responseJson.months;
+  } catch (error) {
+    console.error("月一覧取得エラー:", error);
+    return [];
+  }
+}
+
 function normalizeMoneyInput(value) {
   const halfWidthValue = String(value)
     .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 65248))
@@ -634,21 +653,12 @@ async function renderMonthlyTargetMonthOptions() {
   const monthSelect = document.getElementById("monthly-target-month");
   if (!monthSelect) return;
 
-  const details = await getUnsyncedRecords(DETAIL_STORE);
-  const supports = await getUnsyncedRecords(SUPPORT_STORE);
-  const reserves = await getUnsyncedRecords(RESERVE_STORE);
-
-  const monthSet = new Set();
-  details.forEach((item) => monthSet.add(item.target_month));
-  supports.forEach((item) => monthSet.add(item.target_month));
-  reserves.forEach((item) => monthSet.add(item.target_month));
-
-  const monthList = Array.from(monthSet).filter(Boolean).sort().reverse();
   const currentValue = monthSelect.value;
+  const monthItems = await fetchMonthlyOptions();
 
   monthSelect.innerHTML = "";
 
-  if (monthList.length === 0) {
+  if (monthItems.length === 0) {
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
     emptyOption.textContent = "対象月がありません";
@@ -656,17 +666,18 @@ async function renderMonthlyTargetMonthOptions() {
     return;
   }
 
-  monthList.forEach((month) => {
+  monthItems.forEach((item) => {
     const option = document.createElement("option");
-    option.value = month;
-    option.textContent = month;
+    option.value = item.target_month;
+    option.textContent = item.target_month;
     monthSelect.appendChild(option);
   });
 
-  if (monthList.includes(currentValue)) {
+  const monthValues = monthItems.map((item) => item.target_month);
+  if (monthValues.includes(currentValue)) {
     monthSelect.value = currentValue;
   } else {
-    monthSelect.value = monthList[0];
+    monthSelect.value = monthValues[0];
   }
 }
 
