@@ -8,6 +8,7 @@ const SYNC_URL_STORAGE_KEY = "creditCardAppSyncBaseUrl";
 let db = null;
 let budgetCategories = [];
 let cardNames = [];
+let parentDetailOptions = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -18,6 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initializeDatabase();
     await loadMasterOptions();
     populateMasterOptions();
+    await loadParentDetailOptions();
     setupDetailForm();
     setupSupportForm();
     setupReserveForm();
@@ -139,6 +141,30 @@ async function loadMasterOptions() {
   }
 }
 
+async function loadParentDetailOptions() {
+  const savedUrl = loadSavedSyncBaseUrl();
+
+  if (!savedUrl) {
+    parentDetailOptions = [];
+    return;
+  }
+
+  try {
+    const response = await fetch(`${savedUrl}/detail-options`);
+    const responseJson = await response.json();
+
+    if (!response.ok || !responseJson?.ok || !Array.isArray(responseJson.details)) {
+      parentDetailOptions = [];
+      return;
+    }
+
+    parentDetailOptions = responseJson.details;
+  } catch (error) {
+    console.error("親ファイル明細候補読込エラー:", error);
+    parentDetailOptions = [];
+  }
+}
+
 function populateMasterOptions() {
   const budgetSelect = document.querySelector('select[name="budgetCategory"]');
   const cardSelect = document.querySelector('select[name="cardName"]');
@@ -204,6 +230,9 @@ function setupSyncSettings() {
 
     await loadMasterOptions();
     populateMasterOptions();
+    await loadParentDetailOptions();
+    await renderSupportTargetOptions();
+    await renderReserveTargetOptions();
     await renderMonthlyTargetMonthOptions();
     await renderMonthlySummary();
   });
@@ -274,6 +303,7 @@ function setupSyncButton() {
 
       await loadMasterOptions();
       populateMasterOptions();
+      await loadParentDetailOptions();
       await refreshHomeAndUnsyncedView();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
@@ -489,6 +519,7 @@ function setupDetailForm() {
       detailForm.reset();
       syncDateUiReset("detail-date-input", "detail-date-display");
       await refreshHomeAndUnsyncedView();
+      await loadParentDetailOptions();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
       await renderMonthlyTargetMonthOptions();
@@ -514,14 +545,13 @@ function setupSupportForm() {
 
       const formData = new FormData(supportForm);
       const targetDetailId = String(formData.get("targetDetail") || "").trim();
-      const unsyncedDetails = await getUnsyncedDetails();
-      const targetDetail = unsyncedDetails.find((detail) => detail.detail_id === targetDetailId);
+      const targetDetail = parentDetailOptions.find((detail) => detail.detail_id === targetDetailId);
 
       const supportRecord = {
         support_id: createRecordId("support"),
         target_detail_id: targetDetailId,
-        target_month: targetDetail ? targetDetail.target_month : "",
-        target_purpose: targetDetail ? targetDetail.purpose : "",
+        target_month: targetDetail ? String(targetDetail.target_month || "").trim() : "",
+        target_purpose: targetDetail ? String(targetDetail.purpose || "").trim() : "",
         support_amount: Number(normalizeMoneyInput(formData.get("supportAmount"))),
         support_date: String(formData.get("supportDate") || "").trim(),
         note: String(formData.get("supportNote") || "").trim(),
@@ -564,14 +594,13 @@ function setupReserveForm() {
 
       const formData = new FormData(reserveForm);
       const targetDetailId = String(formData.get("targetReserveDetail") || "").trim();
-      const unsyncedDetails = await getUnsyncedDetails();
-      const targetDetail = unsyncedDetails.find((detail) => detail.detail_id === targetDetailId);
+      const targetDetail = parentDetailOptions.find((detail) => detail.detail_id === targetDetailId);
 
       const reserveRecord = {
         reserve_id: createRecordId("reserve"),
         target_detail_id: targetDetailId,
-        target_month: targetDetail ? targetDetail.target_month : "",
-        target_purpose: targetDetail ? targetDetail.purpose : "",
+        target_month: targetDetail ? String(targetDetail.target_month || "").trim() : "",
+        target_purpose: targetDetail ? String(targetDetail.purpose || "").trim() : "",
         reserve_amount: Number(normalizeMoneyInput(formData.get("reserveAmount"))),
         reserve_date: String(formData.get("reserveDate") || "").trim(),
         note: String(formData.get("reserveNote") || "").trim(),
@@ -1088,91 +1117,72 @@ async function renderUnsyncedDetailList() {
   }
 }
 
+function buildParentDetailOptionLabel(detail) {
+  const useDate = String(detail.use_date || "").trim();
+  const purpose = String(detail.purpose || "").trim();
+  const amount = formatCurrency(detail.amount || 0);
+  const cardName = String(detail.card_name || "").trim();
+  const targetMonth = String(detail.target_month || "").trim();
+  return `${useDate} | ${purpose} | ${amount} | ${cardName} | ${targetMonth}`;
+}
+
 async function renderSupportTargetOptions() {
   const targetSelect = document.querySelector('select[name="targetDetail"]');
   if (!targetSelect) return;
 
-  try {
-    const unsyncedDetails = await getUnsyncedDetails();
-    targetSelect.innerHTML = "";
+  targetSelect.innerHTML = "";
 
-    if (unsyncedDetails.length === 0) {
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = "対象明細がありません";
-      targetSelect.appendChild(emptyOption);
-      return;
-    }
-
-    const firstOption = document.createElement("option");
-    firstOption.value = "";
-    firstOption.textContent = "選択してください";
-    targetSelect.appendChild(firstOption);
-
-    unsyncedDetails.forEach((detail) => {
-      const option = document.createElement("option");
-      option.value = detail.detail_id;
-      option.textContent = buildDetailOptionLabel(detail);
-      targetSelect.appendChild(option);
-    });
-  } catch (error) {
-    console.error(error);
-    targetSelect.innerHTML = "";
-    const errorOption = document.createElement("option");
-    errorOption.value = "";
-    errorOption.textContent = `読込失敗: ${error.message}`;
-    targetSelect.appendChild(errorOption);
+  if (!Array.isArray(parentDetailOptions) || parentDetailOptions.length === 0) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "対象明細がありません";
+    targetSelect.appendChild(emptyOption);
+    return;
   }
+
+  const firstOption = document.createElement("option");
+  firstOption.value = "";
+  firstOption.textContent = "選択してください";
+  targetSelect.appendChild(firstOption);
+
+  parentDetailOptions.forEach((detail) => {
+    const option = document.createElement("option");
+    option.value = detail.detail_id;
+    option.textContent = buildParentDetailOptionLabel(detail);
+    targetSelect.appendChild(option);
+  });
 }
 
 async function renderReserveTargetOptions() {
   const targetSelect = document.querySelector('select[name="targetReserveDetail"]');
   if (!targetSelect) return;
 
-  try {
-    const unsyncedDetails = await getUnsyncedDetails();
-    targetSelect.innerHTML = "";
+  targetSelect.innerHTML = "";
 
-    if (unsyncedDetails.length === 0) {
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = "対象明細がありません";
-      targetSelect.appendChild(emptyOption);
-      return;
-    }
-
-    const firstOption = document.createElement("option");
-    firstOption.value = "";
-    firstOption.textContent = "選択してください";
-    targetSelect.appendChild(firstOption);
-
-    unsyncedDetails.forEach((detail) => {
-      const option = document.createElement("option");
-      option.value = detail.detail_id;
-      option.textContent = buildDetailOptionLabel(detail);
-      targetSelect.appendChild(option);
-    });
-  } catch (error) {
-    console.error(error);
-    targetSelect.innerHTML = "";
-    const errorOption = document.createElement("option");
-    errorOption.value = "";
-    errorOption.textContent = `読込失敗: ${error.message}`;
-    targetSelect.appendChild(errorOption);
+  if (!Array.isArray(parentDetailOptions) || parentDetailOptions.length === 0) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "対象明細がありません";
+    targetSelect.appendChild(emptyOption);
+    return;
   }
+
+  const firstOption = document.createElement("option");
+  firstOption.value = "";
+  firstOption.textContent = "選択してください";
+  targetSelect.appendChild(firstOption);
+
+  parentDetailOptions.forEach((detail) => {
+    const option = document.createElement("option");
+    option.value = detail.detail_id;
+    option.textContent = buildParentDetailOptionLabel(detail);
+    targetSelect.appendChild(option);
+  });
 }
 
 async function refreshHomeAndUnsyncedView() {
   await renderUnsyncedCounts();
   await renderUnsyncedDetailList();
-}
-
-function buildDetailOptionLabel(detail) {
-  const useDate = detail.use_date || "";
-  const purpose = detail.purpose || "";
-  const amount = formatCurrency(detail.amount);
-  const cardName = detail.card_name || "";
-  return `${useDate} | ${purpose} | ${amount} | ${cardName}`;
 }
 
 function formatCurrency(value) {
