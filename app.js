@@ -286,9 +286,16 @@ function markRecordsAsSynced(storeName, records) {
   });
 }
 
-async function fetchMonthlyBalance(targetMonth) {
+async function fetchMonthlyFinancials(targetMonth) {
   const savedUrl = loadSavedSyncBaseUrl();
-  if (!savedUrl) return "未取得";
+  if (!savedUrl) {
+    return {
+      card: null,
+      support: null,
+      reserve: null,
+      balance: null,
+    };
+  }
 
   try {
     const response = await fetch(
@@ -297,18 +304,28 @@ async function fetchMonthlyBalance(targetMonth) {
     const responseJson = await response.json();
 
     if (!response.ok || !responseJson?.ok) {
-      return "未取得";
+      return {
+        card: null,
+        support: null,
+        reserve: null,
+        balance: null,
+      };
     }
 
-    const balanceValue = responseJson.balance;
-    if (balanceValue === null || balanceValue === undefined || balanceValue === "") {
-      return "未取得";
-    }
-
-    return formatCurrency(balanceValue);
+    return {
+      card: responseJson.card,
+      support: responseJson.support,
+      reserve: responseJson.reserve,
+      balance: responseJson.balance,
+    };
   } catch (error) {
-    console.error("残額取得エラー:", error);
-    return "未取得";
+    console.error("月次集計取得エラー:", error);
+    return {
+      card: null,
+      support: null,
+      reserve: null,
+      balance: null,
+    };
   }
 }
 
@@ -690,9 +707,9 @@ async function renderMonthlySummary() {
 
   if (!targetMonth) {
     updateMonthlySummaryDisplay({
-      detailTotal: 0,
-      supportTotal: 0,
-      reserveTotal: 0,
+      detailTotal: null,
+      supportTotal: null,
+      reserveTotal: null,
     });
     updateMonthlyCountDisplay({
       detailCount: 0,
@@ -707,74 +724,42 @@ async function renderMonthlySummary() {
     return;
   }
 
-  const details = await getUnsyncedRecords(DETAIL_STORE);
-  const supports = await getUnsyncedRecords(SUPPORT_STORE);
-  const reserves = await getUnsyncedRecords(RESERVE_STORE);
-
-  const targetMonthDetails = details.filter((record) => record.target_month === targetMonth);
-  const targetMonthSupports = supports.filter((record) => record.target_month === targetMonth);
-  const targetMonthReserves = reserves.filter((record) => record.target_month === targetMonth);
-
-  const detailTotal = sumAmountsByMonth(details, targetMonth, "amount");
-  const supportTotal = sumAmountsByMonth(supports, targetMonth, "support_amount");
-  const reserveTotal = sumAmountsByMonth(reserves, targetMonth, "reserve_amount");
+  const financials = await fetchMonthlyFinancials(targetMonth);
 
   updateMonthlySummaryDisplay({
-    detailTotal,
-    supportTotal,
-    reserveTotal,
+    detailTotal: financials.card,
+    supportTotal: financials.support,
+    reserveTotal: financials.reserve,
   });
-
-  updateMonthlyCountDisplay({
-    detailCount: targetMonthDetails.length,
-    supportCount: targetMonthSupports.length,
-    reserveCount: targetMonthReserves.length,
-  });
-
-  renderMonthlyCardBreakdown(buildCardBreakdown(targetMonthDetails));
-  renderMonthlyBudgetBreakdown(buildBudgetBreakdown(targetMonthDetails));
-  renderMonthlySupportList(targetMonthSupports);
-  renderMonthlyReserveList(targetMonthReserves);
 
   if (balanceElement) {
-    balanceElement.textContent = await fetchMonthlyBalance(targetMonth);
+    balanceElement.textContent =
+      financials.balance === null ? "未取得" : formatCurrency(financials.balance);
   }
-}
 
-function buildCardBreakdown(detailRecords) {
-  const breakdownMap = new Map();
-  cardNames.forEach((cardName) => breakdownMap.set(cardName, 0));
-
-  detailRecords.forEach((record) => {
-    const currentCard = record.card_name || "";
-    const currentAmount = Number(record.amount || 0);
-
-    if (!breakdownMap.has(currentCard)) breakdownMap.set(currentCard, 0);
-    breakdownMap.set(currentCard, breakdownMap.get(currentCard) + currentAmount);
+  updateMonthlyCountDisplay({
+    detailCount: 0,
+    supportCount: 0,
+    reserveCount: 0,
   });
 
-  return Array.from(breakdownMap.entries())
-    .filter(([, amount]) => amount > 0)
-    .map(([cardName, amount]) => ({ cardName, amount }))
-    .sort((a, b) => b.amount - a.amount);
-}
+  renderMonthlyCardBreakdown(
+    financials.card === null ? [] : [{ cardName: "親ファイル集計", amount: financials.card }]
+  );
 
-function buildBudgetBreakdown(detailRecords) {
-  const breakdownMap = new Map();
-  budgetCategories.forEach((category) => breakdownMap.set(category, 0));
+  renderMonthlyBudgetBreakdown([]);
 
-  detailRecords.forEach((record) => {
-    const currentCategory = record.budget_category || "";
-    const currentAmount = Number(record.amount || 0);
+  renderMonthlySupportList(
+    financials.support === null
+      ? []
+      : [{ target_purpose: "親ファイル集計", support_amount: financials.support }]
+  );
 
-    if (!breakdownMap.has(currentCategory)) breakdownMap.set(currentCategory, 0);
-    breakdownMap.set(currentCategory, breakdownMap.get(currentCategory) + currentAmount);
-  });
-
-  return Array.from(breakdownMap.entries())
-    .filter(([, amount]) => amount > 0)
-    .map(([categoryName, amount]) => ({ categoryName, amount }))
-    .sort((a, b) => b.amount - a.amount);
+  renderMonthlyReserveList(
+    financials.reserve === null
+      ? []
+      : [{ target_purpose: "親ファイル集計", reserve_amount: financials.reserve }]
+  );
 }
 
 function renderMonthlyCardBreakdown(cardBreakdown) {
@@ -861,16 +846,13 @@ function renderMonthlyReserveList(reserveRecords) {
     .join("");
 }
 
-function sumAmountsByMonth(records, targetMonth, amountKey) {
-  return records
-    .filter((record) => record.target_month === targetMonth)
-    .reduce((total, record) => total + Number(record[amountKey] || 0), 0);
-}
-
 function updateMonthlySummaryDisplay(summary) {
-  document.getElementById("monthly-total-detail").textContent = formatCurrency(summary.detailTotal);
-  document.getElementById("monthly-total-support").textContent = formatCurrency(summary.supportTotal);
-  document.getElementById("monthly-total-reserve").textContent = formatCurrency(summary.reserveTotal);
+  document.getElementById("monthly-total-detail").textContent =
+    summary.detailTotal === null ? "未取得" : formatCurrency(summary.detailTotal);
+  document.getElementById("monthly-total-support").textContent =
+    summary.supportTotal === null ? "未取得" : formatCurrency(summary.supportTotal);
+  document.getElementById("monthly-total-reserve").textContent =
+    summary.reserveTotal === null ? "未取得" : formatCurrency(summary.reserveTotal);
 }
 
 function updateMonthlyCountDisplay(counts) {
