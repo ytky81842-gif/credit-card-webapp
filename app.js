@@ -448,6 +448,68 @@ async function fetchMonthlyOptions() {
   }
 }
 
+function normalizeMoneyInput(value) {
+  const halfWidthValue = String(value)
+    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 65248))
+    .replace(/，/g, ",")
+    .replace(/．/g, ".");
+
+  return halfWidthValue.replace(/[^\d]/g, "");
+}
+
+function normalizeSyncBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function saveSyncBaseUrl(url) {
+  localStorage.setItem(SYNC_URL_STORAGE_KEY, url);
+}
+
+function loadSavedSyncBaseUrl() {
+  return normalizeSyncBaseUrl(localStorage.getItem(SYNC_URL_STORAGE_KEY) || "");
+}
+
+function initializeDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("このブラウザではIndexedDBが利用できません。"));
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => {
+      reject(new Error(`IndexedDBの初期化に失敗しました: ${request.error?.message || "unknown error"}`));
+    };
+
+    request.onsuccess = () => {
+      db = request.result;
+      resolve();
+    };
+
+    request.onupgradeneeded = (event) => {
+      const database = event.target.result;
+
+      if (!database.objectStoreNames.contains(DETAIL_STORE)) {
+        const detailStore = database.createObjectStore(DETAIL_STORE, { keyPath: "detail_id" });
+        detailStore.createIndex("target_month", "target_month", { unique: false });
+      }
+
+      if (!database.objectStoreNames.contains(SUPPORT_STORE)) {
+        database.createObjectStore(SUPPORT_STORE, { keyPath: "support_id" });
+      }
+
+      if (!database.objectStoreNames.contains(RESERVE_STORE)) {
+        database.createObjectStore(RESERVE_STORE, { keyPath: "reserve_id" });
+      }
+    };
+
+    request.onblocked = () => {
+      reject(new Error("IndexedDBがblocked状態です。別タブや古い接続を閉じてください。"));
+    };
+  });
+}
+
 function getUniqueDetailMonths() {
   const monthSet = new Set();
 
@@ -466,7 +528,7 @@ async function renderSupportTargetMonthOptions() {
   if (!select) return;
 
   const currentValue = select.value;
-  const months = getUniqueDetailMonths();
+  const monthItems = await fetchMonthlyOptions();
 
   select.innerHTML = "";
 
@@ -475,14 +537,15 @@ async function renderSupportTargetMonthOptions() {
   firstOption.textContent = "選択してください";
   select.appendChild(firstOption);
 
-  months.forEach((month) => {
+  monthItems.forEach((item) => {
     const option = document.createElement("option");
-    option.value = month;
-    option.textContent = month;
+    option.value = item.target_month;
+    option.textContent = item.target_month;
     select.appendChild(option);
   });
 
-  if (months.includes(currentValue)) {
+  const values = monthItems.map((item) => item.target_month);
+  if (values.includes(currentValue)) {
     select.value = currentValue;
   }
 }
@@ -492,7 +555,7 @@ async function renderReserveTargetMonthOptions() {
   if (!select) return;
 
   const currentValue = select.value;
-  const months = getUniqueDetailMonths();
+  const monthItems = await fetchMonthlyOptions();
 
   select.innerHTML = "";
 
@@ -501,14 +564,15 @@ async function renderReserveTargetMonthOptions() {
   firstOption.textContent = "選択してください";
   select.appendChild(firstOption);
 
-  months.forEach((month) => {
+  monthItems.forEach((item) => {
     const option = document.createElement("option");
-    option.value = month;
-    option.textContent = month;
+    option.value = item.target_month;
+    option.textContent = item.target_month;
     select.appendChild(option);
   });
 
-  if (months.includes(currentValue)) {
+  const values = monthItems.map((item) => item.target_month);
+  if (values.includes(currentValue)) {
     select.value = currentValue;
   }
 }
