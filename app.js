@@ -5,19 +5,19 @@ const SUPPORT_STORE = "supports";
 const RESERVE_STORE = "reserves";
 const SYNC_URL_STORAGE_KEY = "creditCardAppSyncBaseUrl";
 
-const budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
-const cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL"];
-
 let db = null;
+let budgetCategories = [];
+let cardNames = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     setupViewNavigation();
-    populateMasterOptions();
     setupMoneyInputNormalization();
     setupSyncSettings();
     setupDateUiFields();
     await initializeDatabase();
+    await loadMasterOptions();
+    populateMasterOptions();
     setupDetailForm();
     setupSupportForm();
     setupReserveForm();
@@ -105,12 +105,49 @@ function showView(targetViewId) {
   }
 }
 
+async function loadMasterOptions() {
+  const savedUrl = loadSavedSyncBaseUrl();
+
+  if (!savedUrl) {
+    cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
+    budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
+    return;
+  }
+
+  try {
+    const response = await fetch(`${savedUrl}/master`);
+    const responseJson = await response.json();
+
+    if (!response.ok || !responseJson?.ok) {
+      throw new Error("マスタ取得失敗");
+    }
+
+    cardNames = Array.isArray(responseJson.card_names) ? responseJson.card_names : [];
+    budgetCategories = Array.isArray(responseJson.budget_categories) ? responseJson.budget_categories : [];
+
+    if (cardNames.length === 0) {
+      cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
+    }
+
+    if (budgetCategories.length === 0) {
+      budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
+    }
+  } catch (error) {
+    console.error("マスタ読込エラー:", error);
+    cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
+    budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
+  }
+}
+
 function populateMasterOptions() {
   const budgetSelect = document.querySelector('select[name="budgetCategory"]');
   const cardSelect = document.querySelector('select[name="cardName"]');
   if (!budgetSelect || !cardSelect) {
     throw new Error("フォーム内のselect要素を取得できませんでした。");
   }
+
+  budgetSelect.innerHTML = '<option value="">選択してください</option>';
+  cardSelect.innerHTML = '<option value="">選択してください</option>';
 
   budgetCategories.forEach((category) => {
     const option = document.createElement("option");
@@ -153,7 +190,7 @@ function setupSyncSettings() {
     statusElement.textContent = `保存済みの同期先URL: ${savedUrl}`;
   }
 
-  saveButton.addEventListener("click", () => {
+  saveButton.addEventListener("click", async () => {
     const normalizedUrl = normalizeSyncBaseUrl(syncUrlInput.value);
 
     if (!normalizedUrl) {
@@ -164,6 +201,11 @@ function setupSyncSettings() {
     saveSyncBaseUrl(normalizedUrl);
     syncUrlInput.value = normalizedUrl;
     statusElement.textContent = `同期先URLを保存しました: ${normalizedUrl}`;
+
+    await loadMasterOptions();
+    populateMasterOptions();
+    await renderMonthlyTargetMonthOptions();
+    await renderMonthlySummary();
   });
 }
 
@@ -230,6 +272,8 @@ function setupSyncButton() {
       const supportSkipped = Number(importResults.supports?.skipped || 0);
       const reserveSkipped = Number(importResults.reserves?.skipped || 0);
 
+      await loadMasterOptions();
+      populateMasterOptions();
       await refreshHomeAndUnsyncedView();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
@@ -424,12 +468,12 @@ function setupDetailForm() {
 
       const detailRecord = {
         detail_id: createRecordId("detail"),
-        target_month: convertDateToTargetMonth(formData.get("useDate")),
+        target_month: normalizeTargetMonth(formData.get("useDate")),
         use_date: String(formData.get("useDate") || "").trim(),
         amount: Number(normalizeMoneyInput(formData.get("amount"))),
         purpose: String(formData.get("purpose") || "").trim(),
-        budget_category: String(formData.get("budgetCategory") || ""),
-        card_name: String(formData.get("cardName") || ""),
+        budget_category: String(formData.get("budgetCategory") || "").trim(),
+        card_name: String(formData.get("cardName") || "").trim(),
         note: String(formData.get("note") || "").trim(),
         created_at: new Date().toISOString(),
         synced: false,
@@ -469,7 +513,7 @@ function setupSupportForm() {
       if (!db) throw new Error("DBが初期化されていません。");
 
       const formData = new FormData(supportForm);
-      const targetDetailId = String(formData.get("targetDetail") || "");
+      const targetDetailId = String(formData.get("targetDetail") || "").trim();
       const unsyncedDetails = await getUnsyncedDetails();
       const targetDetail = unsyncedDetails.find((detail) => detail.detail_id === targetDetailId);
 
@@ -519,7 +563,7 @@ function setupReserveForm() {
       if (!db) throw new Error("DBが初期化されていません。");
 
       const formData = new FormData(reserveForm);
-      const targetDetailId = String(formData.get("targetReserveDetail") || "");
+      const targetDetailId = String(formData.get("targetReserveDetail") || "").trim();
       const unsyncedDetails = await getUnsyncedDetails();
       const targetDetail = unsyncedDetails.find((detail) => detail.detail_id === targetDetailId);
 
@@ -861,6 +905,17 @@ function updateMonthlyCountDisplay(counts) {
   document.getElementById("monthly-reserve-count").textContent = String(counts.reserveCount);
 }
 
+function normalizeTargetMonth(dateValue) {
+  const text = String(dateValue || "").trim();
+  if (!text) return "";
+  const parts = text.split("-");
+  if (parts.length !== 3) return "";
+  const year = parts[0];
+  const month = parts[1];
+  if (year.length !== 4 || month.length !== 2) return "";
+  return `${year}-${month}`;
+}
+
 function validateDetailRecord(detailRecord) {
   if (!detailRecord.use_date) return "利用日を入力してください。";
   if (!detailRecord.amount || detailRecord.amount <= 0) return "利用金額は0より大きい数値を入力してください。";
@@ -1138,11 +1193,4 @@ function createRecordId(prefix) {
   const randomPart = Math.random().toString(36).slice(2, 10);
   const timePart = Date.now().toString(36);
   return `${prefix}_${timePart}_${randomPart}`;
-}
-
-function convertDateToTargetMonth(dateString) {
-  if (!dateString) return "";
-  const [year, month] = dateString.split("-");
-  if (!year || !month) return "";
-  return `${year}-${month}`;
 }
