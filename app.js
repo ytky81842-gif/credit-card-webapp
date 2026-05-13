@@ -130,7 +130,9 @@ async function loadMasterOptions() {
     }
 
     cardNames = Array.isArray(responseJson.card_names) ? responseJson.card_names : [];
-    budgetCategories = Array.isArray(responseJson.budget_categories) ? responseJson.budget_categories : [];
+    budgetCategories = Array.isArray(responseJson.budget_categories)
+      ? responseJson.budget_categories
+      : [];
 
     if (cardNames.length === 0) {
       cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
@@ -270,7 +272,9 @@ function setupSyncButton() {
 
   syncButton.addEventListener("click", async () => {
     try {
-      const normalizedUrl = normalizeSyncBaseUrl(syncUrlInput.value || loadSavedSyncBaseUrl());
+      const normalizedUrl = normalizeSyncBaseUrl(
+        syncUrlInput.value || loadSavedSyncBaseUrl()
+      );
 
       if (!normalizedUrl) {
         statusElement.textContent = "同期先URLを入力して保存してください。";
@@ -282,7 +286,9 @@ function setupSyncButton() {
 
       const exportData = await buildUnsyncedExportData();
       const totalCount =
-        exportData.details.length + exportData.supports.length + exportData.reserves.length;
+        exportData.details.length +
+        exportData.supports.length +
+        exportData.reserves.length;
 
       if (totalCount === 0) {
         statusElement.textContent = "未同期データがありません。";
@@ -311,7 +317,9 @@ function setupSyncButton() {
       }
 
       if (!response.ok || !responseJson?.ok) {
-        throw new Error(responseJson?.message || `送信に失敗しました: HTTP ${response.status}`);
+        throw new Error(
+          responseJson?.message || `送信に失敗しました: HTTP ${response.status}`
+        );
       }
 
       await markPayloadAsSynced(exportData);
@@ -382,7 +390,8 @@ function markRecordsAsSynced(storeName, records) {
     });
 
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(new Error(`${storeName} の同期済み更新に失敗しました。`));
+    transaction.onerror = () =>
+      reject(new Error(`${storeName} の同期済み更新に失敗しました。`));
   });
 }
 
@@ -479,7 +488,13 @@ function initializeDatabase() {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
-      reject(new Error(`IndexedDBの初期化に失敗しました: ${request.error?.message || "unknown error"}`));
+      reject(
+        new Error(
+          `IndexedDBの初期化に失敗しました: ${
+            request.error?.message || "unknown error"
+          }`
+        )
+      );
     };
 
     request.onsuccess = () => {
@@ -491,7 +506,9 @@ function initializeDatabase() {
       const database = event.target.result;
 
       if (!database.objectStoreNames.contains(DETAIL_STORE)) {
-        const detailStore = database.createObjectStore(DETAIL_STORE, { keyPath: "detail_id" });
+        const detailStore = database.createObjectStore(DETAIL_STORE, {
+          keyPath: "detail_id",
+        });
         detailStore.createIndex("target_month", "target_month", { unique: false });
       }
 
@@ -505,22 +522,11 @@ function initializeDatabase() {
     };
 
     request.onblocked = () => {
-      reject(new Error("IndexedDBがblocked状態です。別タブや古い接続を閉じてください。"));
+      reject(
+        new Error("IndexedDBがblocked状態です。別タブや古い接続を閉じてください。")
+      );
     };
   });
-}
-
-function getUniqueDetailMonths() {
-  const monthSet = new Set();
-
-  parentDetailOptions.forEach((detail) => {
-    const targetMonth = String(detail.target_month || "").trim();
-    if (targetMonth) {
-      monthSet.add(targetMonth);
-    }
-  });
-
-  return Array.from(monthSet).sort().reverse();
 }
 
 async function renderSupportTargetMonthOptions() {
@@ -528,7 +534,13 @@ async function renderSupportTargetMonthOptions() {
   if (!select) return;
 
   const currentValue = select.value;
-  const monthItems = await fetchMonthlyOptions();
+  const months = Array.from(
+    new Set(
+      parentDetailOptions
+        .map((detail) => String(detail.target_month || "").trim())
+        .filter((month) => month)
+    )
+  ).sort().reverse();
 
   select.innerHTML = "";
 
@@ -537,15 +549,14 @@ async function renderSupportTargetMonthOptions() {
   firstOption.textContent = "選択してください";
   select.appendChild(firstOption);
 
-  monthItems.forEach((item) => {
+  months.forEach((month) => {
     const option = document.createElement("option");
-    option.value = item.target_month;
-    option.textContent = item.target_month;
+    option.value = month;
+    option.textContent = month;
     select.appendChild(option);
   });
 
-  const values = monthItems.map((item) => item.target_month);
-  if (values.includes(currentValue)) {
+  if (months.includes(currentValue)) {
     select.value = currentValue;
   }
 }
@@ -555,7 +566,13 @@ async function renderReserveTargetMonthOptions() {
   if (!select) return;
 
   const currentValue = select.value;
-  const monthItems = await fetchMonthlyOptions();
+  const months = Array.from(
+    new Set(
+      parentDetailOptions
+        .map((detail) => String(detail.target_month || "").trim())
+        .filter((month) => month)
+    )
+  ).sort().reverse();
 
   select.innerHTML = "";
 
@@ -564,15 +581,14 @@ async function renderReserveTargetMonthOptions() {
   firstOption.textContent = "選択してください";
   select.appendChild(firstOption);
 
-  monthItems.forEach((item) => {
+  months.forEach((month) => {
     const option = document.createElement("option");
-    option.value = item.target_month;
-    option.textContent = item.target_month;
+    option.value = month;
+    option.textContent = month;
     select.appendChild(option);
   });
 
-  const values = monthItems.map((item) => item.target_month);
-  if (values.includes(currentValue)) {
+  if (months.includes(currentValue)) {
     select.value = currentValue;
   }
 }
@@ -640,7 +656,9 @@ function setupSupportForm() {
 
       const formData = new FormData(supportForm);
       const targetDetailId = String(formData.get("targetDetail") || "").trim();
-      const targetDetail = parentDetailOptions.find((detail) => detail.detail_id === targetDetailId);
+      const targetDetail = parentDetailOptions.find(
+        (detail) => detail.detail_id === targetDetailId
+      );
 
       const supportRecord = {
         support_id: createRecordId("support"),
@@ -689,7 +707,9 @@ function setupReserveForm() {
 
       const formData = new FormData(reserveForm);
       const targetDetailId = String(formData.get("targetReserveDetail") || "").trim();
-      const targetDetail = parentDetailOptions.find((detail) => detail.detail_id === targetDetailId);
+      const targetDetail = parentDetailOptions.find(
+        (detail) => detail.detail_id === targetDetailId
+      );
 
       const reserveRecord = {
         reserve_id: createRecordId("reserve"),
@@ -744,7 +764,9 @@ function setupExportButton() {
     try {
       const exportData = await buildUnsyncedExportData();
       const totalCount =
-        exportData.details.length + exportData.supports.length + exportData.reserves.length;
+        exportData.details.length +
+        exportData.supports.length +
+        exportData.reserves.length;
 
       if (totalCount === 0) {
         alert("未同期データがありません。");
@@ -830,7 +852,8 @@ function getUnsyncedRecords(storeName) {
       resolve(unsyncedRecords);
     };
 
-    request.onerror = () => reject(new Error(`${storeName} の未同期データ取得に失敗しました。`));
+    request.onerror = () =>
+      reject(new Error(`${storeName} の未同期データ取得に失敗しました。`));
   });
 }
 
@@ -1042,7 +1065,8 @@ function normalizeTargetMonth(dateValue) {
 
 function validateDetailRecord(detailRecord) {
   if (!detailRecord.use_date) return "利用日を入力してください。";
-  if (!detailRecord.amount || detailRecord.amount <= 0) return "利用金額は0より大きい数値を入力してください。";
+  if (!detailRecord.amount || detailRecord.amount <= 0)
+    return "利用金額は0より大きい数値を入力してください。";
   if (!detailRecord.purpose) return "利用用途を入力してください。";
   if (!detailRecord.budget_category) return "予算分類を選択してください。";
   if (!detailRecord.card_name) return "利用カードを選択してください。";
@@ -1052,7 +1076,8 @@ function validateDetailRecord(detailRecord) {
 
 function validateSupportRecord(supportRecord) {
   if (!supportRecord.target_detail_id) return "対象明細を選択してください。";
-  if (!supportRecord.support_amount || supportRecord.support_amount <= 0) return "支援金額は0より大きい数値を入力してください。";
+  if (!supportRecord.support_amount || supportRecord.support_amount <= 0)
+    return "支援金額は0より大きい数値を入力してください。";
   if (!supportRecord.support_date) return "登録日を入力してください。";
   if (!supportRecord.target_month) return "対象明細の対象月を取得できませんでした。";
   return "";
@@ -1060,7 +1085,8 @@ function validateSupportRecord(supportRecord) {
 
 function validateReserveRecord(reserveRecord) {
   if (!reserveRecord.target_detail_id) return "対象明細を選択してください。";
-  if (!reserveRecord.reserve_amount || reserveRecord.reserve_amount <= 0) return "準備金額は0より大きい数値を入力してください。";
+  if (!reserveRecord.reserve_amount || reserveRecord.reserve_amount <= 0)
+    return "準備金額は0より大きい数値を入力してください。";
   if (!reserveRecord.reserve_date) return "登録日を入力してください。";
   if (!reserveRecord.target_month) return "対象明細の対象月を取得できませんでした。";
   return "";
@@ -1077,9 +1103,11 @@ function saveDetailRecord(detailRecord) {
     const store = transaction.objectStore(DETAIL_STORE);
     const request = store.add(detailRecord);
 
-    transaction.onerror = () => reject(new Error(`transaction失敗: ${transaction.error?.message || "unknown error"}`));
+    transaction.onerror = () =>
+      reject(new Error(`transaction失敗: ${transaction.error?.message || "unknown error"}`));
     request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error(`明細保存に失敗しました: ${request.error?.message || "unknown error"}`));
+    request.onerror = () =>
+      reject(new Error(`明細保存に失敗しました: ${request.error?.message || "unknown error"}`));
   });
 }
 
@@ -1094,9 +1122,11 @@ function saveSupportRecord(supportRecord) {
     const store = transaction.objectStore(SUPPORT_STORE);
     const request = store.add(supportRecord);
 
-    transaction.onerror = () => reject(new Error(`transaction失敗: ${transaction.error?.message || "unknown error"}`));
+    transaction.onerror = () =>
+      reject(new Error(`transaction失敗: ${transaction.error?.message || "unknown error"}`));
     request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error(`支援金保存に失敗しました: ${request.error?.message || "unknown error"}`));
+    request.onerror = () =>
+      reject(new Error(`支援金保存に失敗しました: ${request.error?.message || "unknown error"}`));
   });
 }
 
@@ -1111,9 +1141,11 @@ function saveReserveRecord(reserveRecord) {
     const store = transaction.objectStore(RESERVE_STORE);
     const request = store.add(reserveRecord);
 
-    transaction.onerror = () => reject(new Error(`transaction失敗: ${transaction.error?.message || "unknown error"}`));
+    transaction.onerror = () =>
+      reject(new Error(`transaction失敗: ${transaction.error?.message || "unknown error"}`));
     request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error(`準備金保存に失敗しました: ${request.error?.message || "unknown error"}`));
+    request.onerror = () =>
+      reject(new Error(`準備金保存に失敗しました: ${request.error?.message || "unknown error"}`));
   });
 }
 
@@ -1139,7 +1171,8 @@ function countUnsyncedRecords(storeName) {
       }
     };
 
-    request.onerror = () => reject(new Error(`${storeName} の未同期件数取得に失敗しました。`));
+    request.onerror = () =>
+      reject(new Error(`${storeName} の未同期件数取得に失敗しました。`));
   });
 }
 
@@ -1208,7 +1241,9 @@ async function renderUnsyncedDetailList() {
       .join("");
   } catch (error) {
     console.error(error);
-    listElement.innerHTML = `<p class="empty-message">一覧取得に失敗しました: ${escapeHtml(error.message)}</p>`;
+    listElement.innerHTML = `<p class="empty-message">一覧取得に失敗しました: ${escapeHtml(
+      error.message
+    )}</p>`;
   }
 }
 
@@ -1223,7 +1258,9 @@ function buildParentDetailOptionLabel(detail) {
 function filterParentDetailsByMonth(targetMonth) {
   const normalized = String(targetMonth || "").trim();
   if (!normalized) return [];
-  return parentDetailOptions.filter((detail) => String(detail.target_month || "").trim() === normalized);
+  return parentDetailOptions.filter(
+    (detail) => String(detail.target_month || "").trim() === normalized
+  );
 }
 
 async function renderSupportTargetOptions() {
