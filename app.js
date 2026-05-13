@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadMasterOptions();
     populateMasterOptions();
     await loadParentDetailOptions();
+    setupTargetMonthSelectors();
     setupDetailForm();
     setupSupportForm();
     setupReserveForm();
@@ -27,6 +28,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupMonthlyTargetMonthSelector();
     setupSyncButton();
     await refreshHomeAndUnsyncedView();
+    await renderSupportTargetMonthOptions();
+    await renderReserveTargetMonthOptions();
     await renderSupportTargetOptions();
     await renderReserveTargetOptions();
     await renderMonthlyTargetMonthOptions();
@@ -81,10 +84,12 @@ function setupViewNavigation() {
       }
 
       if (targetViewId === "support-view") {
+        await renderSupportTargetMonthOptions();
         await renderSupportTargetOptions();
       }
 
       if (targetViewId === "reserve-view") {
+        await renderReserveTargetMonthOptions();
         await renderReserveTargetOptions();
       }
 
@@ -165,6 +170,23 @@ async function loadParentDetailOptions() {
   }
 }
 
+function setupTargetMonthSelectors() {
+  const supportTargetMonth = document.getElementById("support-target-month");
+  const reserveTargetMonth = document.getElementById("reserve-target-month");
+
+  if (supportTargetMonth) {
+    supportTargetMonth.addEventListener("change", async () => {
+      await renderSupportTargetOptions();
+    });
+  }
+
+  if (reserveTargetMonth) {
+    reserveTargetMonth.addEventListener("change", async () => {
+      await renderReserveTargetOptions();
+    });
+  }
+}
+
 function populateMasterOptions() {
   const budgetSelect = document.querySelector('select[name="budgetCategory"]');
   const cardSelect = document.querySelector('select[name="cardName"]');
@@ -231,6 +253,8 @@ function setupSyncSettings() {
     await loadMasterOptions();
     populateMasterOptions();
     await loadParentDetailOptions();
+    await renderSupportTargetMonthOptions();
+    await renderReserveTargetMonthOptions();
     await renderSupportTargetOptions();
     await renderReserveTargetOptions();
     await renderMonthlyTargetMonthOptions();
@@ -305,6 +329,8 @@ function setupSyncButton() {
       populateMasterOptions();
       await loadParentDetailOptions();
       await refreshHomeAndUnsyncedView();
+      await renderSupportTargetMonthOptions();
+      await renderReserveTargetMonthOptions();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
       await renderMonthlyTargetMonthOptions();
@@ -422,66 +448,69 @@ async function fetchMonthlyOptions() {
   }
 }
 
-function normalizeMoneyInput(value) {
-  const halfWidthValue = String(value)
-    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 65248))
-    .replace(/，/g, ",")
-    .replace(/．/g, ".");
+function getUniqueDetailMonths() {
+  const monthSet = new Set();
 
-  return halfWidthValue.replace(/[^\d]/g, "");
-}
-
-function normalizeSyncBaseUrl(value) {
-  return String(value || "").trim().replace(/\/+$/, "");
-}
-
-function saveSyncBaseUrl(url) {
-  localStorage.setItem(SYNC_URL_STORAGE_KEY, url);
-}
-
-function loadSavedSyncBaseUrl() {
-  return normalizeSyncBaseUrl(localStorage.getItem(SYNC_URL_STORAGE_KEY) || "");
-}
-
-function initializeDatabase() {
-  return new Promise((resolve, reject) => {
-    if (!window.indexedDB) {
-      reject(new Error("このブラウザではIndexedDBが利用できません。"));
-      return;
+  parentDetailOptions.forEach((detail) => {
+    const targetMonth = String(detail.target_month || "").trim();
+    if (targetMonth) {
+      monthSet.add(targetMonth);
     }
-
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => {
-      reject(new Error(`IndexedDBの初期化に失敗しました: ${request.error?.message || "unknown error"}`));
-    };
-
-    request.onsuccess = () => {
-      db = request.result;
-      resolve();
-    };
-
-    request.onupgradeneeded = (event) => {
-      const database = event.target.result;
-
-      if (!database.objectStoreNames.contains(DETAIL_STORE)) {
-        const detailStore = database.createObjectStore(DETAIL_STORE, { keyPath: "detail_id" });
-        detailStore.createIndex("target_month", "target_month", { unique: false });
-      }
-
-      if (!database.objectStoreNames.contains(SUPPORT_STORE)) {
-        database.createObjectStore(SUPPORT_STORE, { keyPath: "support_id" });
-      }
-
-      if (!database.objectStoreNames.contains(RESERVE_STORE)) {
-        database.createObjectStore(RESERVE_STORE, { keyPath: "reserve_id" });
-      }
-    };
-
-    request.onblocked = () => {
-      reject(new Error("IndexedDBがblocked状態です。別タブや古い接続を閉じてください。"));
-    };
   });
+
+  return Array.from(monthSet).sort().reverse();
+}
+
+async function renderSupportTargetMonthOptions() {
+  const select = document.getElementById("support-target-month");
+  if (!select) return;
+
+  const currentValue = select.value;
+  const months = getUniqueDetailMonths();
+
+  select.innerHTML = "";
+
+  const firstOption = document.createElement("option");
+  firstOption.value = "";
+  firstOption.textContent = "選択してください";
+  select.appendChild(firstOption);
+
+  months.forEach((month) => {
+    const option = document.createElement("option");
+    option.value = month;
+    option.textContent = month;
+    select.appendChild(option);
+  });
+
+  if (months.includes(currentValue)) {
+    select.value = currentValue;
+  }
+}
+
+async function renderReserveTargetMonthOptions() {
+  const select = document.getElementById("reserve-target-month");
+  if (!select) return;
+
+  const currentValue = select.value;
+  const months = getUniqueDetailMonths();
+
+  select.innerHTML = "";
+
+  const firstOption = document.createElement("option");
+  firstOption.value = "";
+  firstOption.textContent = "選択してください";
+  select.appendChild(firstOption);
+
+  months.forEach((month) => {
+    const option = document.createElement("option");
+    option.value = month;
+    option.textContent = month;
+    select.appendChild(option);
+  });
+
+  if (months.includes(currentValue)) {
+    select.value = currentValue;
+  }
 }
 
 function setupDetailForm() {
@@ -520,6 +549,8 @@ function setupDetailForm() {
       syncDateUiReset("detail-date-input", "detail-date-display");
       await refreshHomeAndUnsyncedView();
       await loadParentDetailOptions();
+      await renderSupportTargetMonthOptions();
+      await renderReserveTargetMonthOptions();
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
       await renderMonthlyTargetMonthOptions();
@@ -1122,17 +1153,34 @@ function buildParentDetailOptionLabel(detail) {
   const purpose = String(detail.purpose || "").trim();
   const amount = formatCurrency(detail.amount || 0);
   const cardName = String(detail.card_name || "").trim();
-  const targetMonth = String(detail.target_month || "").trim();
-  return `${useDate} | ${purpose} | ${amount} | ${cardName} | ${targetMonth}`;
+  return `${useDate} | ${purpose} | ${amount} | ${cardName}`;
+}
+
+function filterParentDetailsByMonth(targetMonth) {
+  const normalized = String(targetMonth || "").trim();
+  if (!normalized) return [];
+  return parentDetailOptions.filter((detail) => String(detail.target_month || "").trim() === normalized);
 }
 
 async function renderSupportTargetOptions() {
   const targetSelect = document.querySelector('select[name="targetDetail"]');
-  if (!targetSelect) return;
+  const monthSelect = document.getElementById("support-target-month");
+  if (!targetSelect || !monthSelect) return;
 
+  const targetMonth = String(monthSelect.value || "").trim();
   targetSelect.innerHTML = "";
 
-  if (!Array.isArray(parentDetailOptions) || parentDetailOptions.length === 0) {
+  if (!targetMonth) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "対象月を選択してください";
+    targetSelect.appendChild(emptyOption);
+    return;
+  }
+
+  const filteredDetails = filterParentDetailsByMonth(targetMonth);
+
+  if (filteredDetails.length === 0) {
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
     emptyOption.textContent = "対象明細がありません";
@@ -1145,7 +1193,7 @@ async function renderSupportTargetOptions() {
   firstOption.textContent = "選択してください";
   targetSelect.appendChild(firstOption);
 
-  parentDetailOptions.forEach((detail) => {
+  filteredDetails.forEach((detail) => {
     const option = document.createElement("option");
     option.value = detail.detail_id;
     option.textContent = buildParentDetailOptionLabel(detail);
@@ -1155,11 +1203,23 @@ async function renderSupportTargetOptions() {
 
 async function renderReserveTargetOptions() {
   const targetSelect = document.querySelector('select[name="targetReserveDetail"]');
-  if (!targetSelect) return;
+  const monthSelect = document.getElementById("reserve-target-month");
+  if (!targetSelect || !monthSelect) return;
 
+  const targetMonth = String(monthSelect.value || "").trim();
   targetSelect.innerHTML = "";
 
-  if (!Array.isArray(parentDetailOptions) || parentDetailOptions.length === 0) {
+  if (!targetMonth) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "対象月を選択してください";
+    targetSelect.appendChild(emptyOption);
+    return;
+  }
+
+  const filteredDetails = filterParentDetailsByMonth(targetMonth);
+
+  if (filteredDetails.length === 0) {
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
     emptyOption.textContent = "対象明細がありません";
@@ -1172,7 +1232,7 @@ async function renderReserveTargetOptions() {
   firstOption.textContent = "選択してください";
   targetSelect.appendChild(firstOption);
 
-  parentDetailOptions.forEach((detail) => {
+  filteredDetails.forEach((detail) => {
     const option = document.createElement("option");
     option.value = detail.detail_id;
     option.textContent = buildParentDetailOptionLabel(detail);

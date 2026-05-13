@@ -6,7 +6,7 @@
     <title>クレジットカード管理アプリ</title>
     <script>
       (function () {
-        const CURRENT_VERSION = "20260510f";
+        const CURRENT_VERSION = "20260510i";
         const url = new URL(window.location.href);
         const currentVersion = url.searchParams.get("v");
 
@@ -16,7 +16,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="style.css?v=20260510f" />
+    <link rel="stylesheet" href="style.css?v=20260510i" />
   </head>
   <body>
     <div class="app-shell">
@@ -114,10 +114,17 @@
             </div>
 
             <form id="support-form" class="form-grid">
+              <label>
+                <span>対象月</span>
+                <select id="support-target-month" name="supportTargetMonth">
+                  <option value="">選択してください</option>
+                </select>
+              </label>
+
               <label class="full-width">
                 <span>対象明細</span>
                 <select name="targetDetail">
-                  <option value="">読み込み中...</option>
+                  <option value="">対象月を選択してください</option>
                 </select>
               </label>
 
@@ -152,10 +159,17 @@
             </div>
 
             <form id="reserve-form" class="form-grid">
+              <label>
+                <span>対象月</span>
+                <select id="reserve-target-month" name="reserveTargetMonth">
+                  <option value="">選択してください</option>
+                </select>
+              </label>
+
               <label class="full-width">
                 <span>対象明細</span>
                 <select name="targetReserveDetail">
-                  <option value="">読み込み中...</option>
+                  <option value="">対象月を選択してください</option>
                 </select>
               </label>
 
@@ -201,15 +215,15 @@
             <div class="summary-grid">
               <div class="summary-item">
                 <span>明細合計</span>
-                <strong id="monthly-total-detail">¥0</strong>
+                <strong id="monthly-total-detail">未取得</strong>
               </div>
               <div class="summary-item">
                 <span>支援計</span>
-                <strong id="monthly-total-support">¥0</strong>
+                <strong id="monthly-total-support">未取得</strong>
               </div>
               <div class="summary-item">
                 <span>準備金計</span>
-                <strong id="monthly-total-reserve">¥0</strong>
+                <strong id="monthly-total-reserve">未取得</strong>
               </div>
               <div class="summary-item">
                 <span>残額</span>
@@ -233,14 +247,14 @@
             </div>
 
             <div class="monthly-block">
-              <h3>カード別請求額（仮）</h3>
+              <h3>カード別請求額</h3>
               <div id="monthly-card-breakdown" class="monthly-list">
                 <p class="empty-message">対象月のカード利用はありません。</p>
               </div>
             </div>
 
             <div class="monthly-block">
-              <h3>予算分類別集計（仮）</h3>
+              <h3>予算分類別集計</h3>
               <div id="monthly-budget-breakdown" class="monthly-list">
                 <p class="empty-message">対象月の分類別データはありません。</p>
               </div>
@@ -258,11 +272,6 @@
               <div id="monthly-reserve-list" class="monthly-list">
                 <p class="empty-message">対象月の準備金はありません。</p>
               </div>
-            </div>
-
-            <div class="monthly-note">
-              <p>※ 現時点では一部がローカル保存データによる仮集計です。</p>
-              <p>※ 残額は次工程で元データExcel参照に接続します。</p>
             </div>
           </div>
         </section>
@@ -282,7 +291,7 @@
                   <input
                     type="text"
                     id="sync-base-url"
-                    placeholder="例: http://192.168.1.8:8765"
+                    placeholder="例: https://macbook-yuta.xxxxx.ts.net"
                     autocapitalize="off"
                     autocomplete="off"
                     autocorrect="off"
@@ -310,6 +319,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=20260510h"></script>
+    <script src="app.js?v=20260510i"></script>
   </body>
 </html>
