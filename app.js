@@ -84,11 +84,13 @@ function setupViewNavigation() {
       }
 
       if (targetViewId === "support-view") {
+        await loadParentDetailOptions();
         await renderSupportTargetMonthOptions();
         await renderSupportTargetOptions();
       }
 
       if (targetViewId === "reserve-view") {
+        await loadParentDetailOptions();
         await renderReserveTargetMonthOptions();
         await renderReserveTargetOptions();
       }
@@ -403,6 +405,7 @@ async function fetchMonthlyFinancials(targetMonth) {
       support: null,
       reserve: null,
       balance: null,
+      cardBreakdown: [],
     };
   }
 
@@ -418,6 +421,7 @@ async function fetchMonthlyFinancials(targetMonth) {
         support: null,
         reserve: null,
         balance: null,
+        cardBreakdown: [],
       };
     }
 
@@ -426,6 +430,9 @@ async function fetchMonthlyFinancials(targetMonth) {
       support: responseJson.support,
       reserve: responseJson.reserve,
       balance: responseJson.balance,
+      cardBreakdown: Array.isArray(responseJson.card_breakdown)
+        ? responseJson.card_breakdown
+        : [],
     };
   } catch (error) {
     console.error("月次集計取得エラー:", error);
@@ -434,6 +441,7 @@ async function fetchMonthlyFinancials(targetMonth) {
       support: null,
       reserve: null,
       balance: null,
+      cardBreakdown: [],
     };
   }
 }
@@ -934,9 +942,7 @@ async function renderMonthlySummary() {
     reserveCount: 0,
   });
 
-  renderMonthlyCardBreakdown(
-    financials.card === null ? [] : [{ cardName: "親ファイル集計", amount: financials.card }]
-  );
+  renderMonthlyCardBreakdown(financials.cardBreakdown || []);
 
   renderMonthlyBudgetBreakdown([]);
 
@@ -957,7 +963,7 @@ function renderMonthlyCardBreakdown(cardBreakdown) {
   const listElement = document.getElementById("monthly-card-breakdown");
   if (!listElement) return;
 
-  if (cardBreakdown.length === 0) {
+  if (!Array.isArray(cardBreakdown) || cardBreakdown.length === 0) {
     listElement.innerHTML = '<p class="empty-message">対象月のカード利用はありません。</p>';
     return;
   }
@@ -966,7 +972,7 @@ function renderMonthlyCardBreakdown(cardBreakdown) {
     .map(
       (item) => `
         <div class="monthly-row">
-          <span class="monthly-row-label">${escapeHtml(item.cardName)}</span>
+          <span class="monthly-row-label">${escapeHtml(item.card_name || "未設定")}</span>
           <span class="monthly-row-value">${formatCurrency(item.amount)}</span>
         </div>
       `
