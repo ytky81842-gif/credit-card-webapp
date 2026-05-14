@@ -9,6 +9,7 @@ let db = null;
 let budgetCategories = [];
 let cardNames = [];
 let parentDetailOptions = [];
+let isParentRefreshRunning = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -16,11 +17,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupMoneyInputNormalization();
     setupSyncSettings();
     setupDateUiFields();
+    setupTargetMonthSelectors();
+    setupRefreshParentDataButton();
+    setupAppForegroundRefresh();
     await initializeDatabase();
     await loadMasterOptions();
     populateMasterOptions();
     await loadParentDetailOptions();
-    setupTargetMonthSelectors();
     setupDetailForm();
     setupSupportForm();
     setupReserveForm();
@@ -78,27 +81,7 @@ function setupViewNavigation() {
     button.addEventListener("click", async () => {
       const targetViewId = button.dataset.view;
       showView(targetViewId);
-
-      if (targetViewId === "unsynced-view") {
-        await renderUnsyncedDetailList();
-      }
-
-      if (targetViewId === "support-view") {
-        await loadParentDetailOptions();
-        await renderSupportTargetMonthOptions();
-        await renderSupportTargetOptions();
-      }
-
-      if (targetViewId === "reserve-view") {
-        await loadParentDetailOptions();
-        await renderReserveTargetMonthOptions();
-        await renderReserveTargetOptions();
-      }
-
-      if (targetViewId === "monthly-view") {
-        await renderMonthlyTargetMonthOptions();
-        await renderMonthlySummary();
-      }
+      await refreshServerBackedView(targetViewId);
     });
   });
 }
@@ -114,6 +97,104 @@ function showView(targetViewId) {
   }
 }
 
+function getActiveViewId() {
+  const activeView = document.querySelector(".view.active-view");
+  return activeView ? activeView.id : "home-view";
+}
+
+function setupRefreshParentDataButton() {
+  const button = document.getElementById("refresh-parent-data-button");
+  if (!button) return;
+
+  button.addEventListener("click", async () => {
+    await refreshParentDataAndCurrentView(true);
+  });
+}
+
+function setupAppForegroundRefresh() {
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible") {
+      await refreshParentDataAndCurrentView(false);
+    }
+  });
+
+  window.addEventListener("focus", async () => {
+    await refreshParentDataAndCurrentView(false);
+  });
+}
+
+function setRefreshParentStatus(message) {
+  const status = document.getElementById("refresh-parent-data-status");
+  if (!status) return;
+  status.textContent = message;
+}
+
+async function refreshParentDataAndCurrentView(showStatusMessage = false) {
+  if (isParentRefreshRunning) return;
+
+  const savedUrl = loadSavedSyncBaseUrl();
+  if (!savedUrl) {
+    if (showStatusMessage) {
+      setRefreshParentStatus("同期先URL未設定のため親ファイル再読込は未実行です。");
+    }
+    return;
+  }
+
+  isParentRefreshRunning = true;
+
+  try {
+    if (showStatusMessage) {
+      setRefreshParentStatus("親ファイルを再読込中です...");
+    }
+
+    await loadMasterOptions();
+    populateMasterOptions();
+    await loadParentDetailOptions();
+
+    const activeViewId = getActiveViewId();
+    await refreshServerBackedView(activeViewId);
+
+    if (showStatusMessage) {
+      const now = new Date();
+      setRefreshParentStatus(`親ファイル再読込完了: ${now.toLocaleTimeString("ja-JP")}`);
+    }
+  } catch (error) {
+    console.error("親ファイル再読込エラー:", error);
+    if (showStatusMessage) {
+      setRefreshParentStatus(`親ファイル再読込失敗: ${error.message}`);
+    }
+  } finally {
+    isParentRefreshRunning = false;
+  }
+}
+
+async function refreshServerBackedView(viewId) {
+  if (viewId === "unsynced-view") {
+    await renderUnsyncedDetailList();
+    return;
+  }
+
+  if (viewId === "support-view") {
+    await loadParentDetailOptions();
+    await renderSupportTargetMonthOptions();
+    await renderSupportTargetOptions();
+    return;
+  }
+
+  if (viewId === "reserve-view") {
+    await loadParentDetailOptions();
+    await renderReserveTargetMonthOptions();
+    await renderReserveTargetOptions();
+    return;
+  }
+
+  if (viewId === "monthly-view") {
+    await renderMonthlyTargetMonthOptions();
+    await renderMonthlySummary();
+    return;
+  }
+}
+
 async function loadMasterOptions() {
   const savedUrl = loadSavedSyncBaseUrl();
 
@@ -124,7 +205,7 @@ async function loadMasterOptions() {
   }
 
   try {
-    const response = await fetch(`${savedUrl}/master`);
+    const response = await fetch(`${savedUrl}/master?ts=${Date.now()}`, { cache: "no-store" });
     const responseJson = await response.json();
 
     if (!response.ok || !responseJson?.ok) {
@@ -159,7 +240,7 @@ async function loadParentDetailOptions() {
   }
 
   try {
-    const response = await fetch(`${savedUrl}/detail-options`);
+    const response = await fetch(`${savedUrl}/detail-options?ts=${Date.now()}`, { cache: "no-store" });
     const responseJson = await response.json();
 
     if (!response.ok || !responseJson?.ok || !Array.isArray(responseJson.details)) {
@@ -349,6 +430,8 @@ function setupSyncButton() {
       statusElement.textContent =
         `同期完了: 取込 明細${detailImported}件 / 支援金${supportImported}件 / 準備金${reserveImported}件`;
 
+      setRefreshParentStatus(`同期反映済み: ${new Date().toLocaleTimeString("ja-JP")}`);
+
       alert(
         `同期完了\n` +
           `取込: 明細 ${detailImported}件 / 支援金 ${supportImported}件 / 準備金 ${reserveImported}件\n` +
@@ -411,7 +494,8 @@ async function fetchMonthlyFinancials(targetMonth) {
 
   try {
     const response = await fetch(
-      `${savedUrl}/balance?month=${encodeURIComponent(targetMonth)}`
+      `${savedUrl}/balance?month=${encodeURIComponent(targetMonth)}&ts=${Date.now()}`,
+      { cache: "no-store" }
     );
     const responseJson = await response.json();
 
@@ -451,7 +535,7 @@ async function fetchMonthlyOptions() {
   if (!savedUrl) return [];
 
   try {
-    const response = await fetch(`${savedUrl}/months`);
+    const response = await fetch(`${savedUrl}/months?ts=${Date.now()}`, { cache: "no-store" });
     const responseJson = await response.json();
 
     if (!response.ok || !responseJson?.ok || !Array.isArray(responseJson.months)) {
@@ -943,7 +1027,6 @@ async function renderMonthlySummary() {
   });
 
   renderMonthlyCardBreakdown(financials.cardBreakdown || []);
-
   renderMonthlyBudgetBreakdown([]);
 
   renderMonthlySupportList(

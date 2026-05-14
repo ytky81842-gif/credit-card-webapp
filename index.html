@@ -6,7 +6,7 @@
     <title>クレジットカード管理アプリ</title>
     <script>
       (function () {
-        const CURRENT_VERSION = "20260510n";
+        const CURRENT_VERSION = "20260510o";
         const url = new URL(window.location.href);
         const currentVersion = url.searchParams.get("v");
 
@@ -16,13 +16,17 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="style.css?v=20260510n" />
+    <link rel="stylesheet" href="style.css?v=20260510o" />
   </head>
   <body>
     <div class="app-shell">
       <header class="app-header">
         <h1>クレジットカード管理アプリ</h1>
         <p class="sub-text">iPhone入力・Mac管理用の初期画面</p>
+        <button type="button" id="refresh-parent-data-button" class="secondary-button">
+          親ファイル再読込
+        </button>
+        <p id="refresh-parent-data-status" class="helper-text">必要なときに親ファイルの最新状態を再取得します。</p>
       </header>
 
       <main class="main-content">
@@ -319,6 +323,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=20260510n"></script>
+    <script src="app.js?v=20260510o"></script>
   </body>
 </html>
