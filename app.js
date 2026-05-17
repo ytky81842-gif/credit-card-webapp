@@ -4,6 +4,7 @@ const DETAIL_STORE = "details";
 const SUPPORT_STORE = "supports";
 const RESERVE_STORE = "reserves";
 const SYNC_URL_STORAGE_KEY = "creditCardAppSyncBaseUrl";
+const MONTHLY_CACHE_STORAGE_KEY = "creditCardAppMonthlyCache";
 
 let db = null;
 let budgetCategories = [];
@@ -199,7 +200,7 @@ async function loadMasterOptions() {
   const savedUrl = loadSavedSyncBaseUrl();
 
   if (!savedUrl) {
-    cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
+    cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾンゴールド", "JAL", "NL"];
     budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
     return;
   }
@@ -218,7 +219,7 @@ async function loadMasterOptions() {
       : [];
 
     if (cardNames.length === 0) {
-      cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
+      cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾンゴールド", "JAL", "NL"];
     }
 
     if (budgetCategories.length === 0) {
@@ -226,7 +227,7 @@ async function loadMasterOptions() {
     }
   } catch (error) {
     console.error("マスタ読込エラー:", error);
-    cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾン金", "JAL", "NL"];
+    cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾンゴールド", "JAL", "NL"];
     budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
   }
 }
@@ -425,7 +426,7 @@ function setupSyncButton() {
       await renderSupportTargetOptions();
       await renderReserveTargetOptions();
       await renderMonthlyTargetMonthOptions();
-      await renderMonthlySummary();
+      await renderMonthlySummary(true);
 
       statusElement.textContent =
         `同期完了: 取込 明細${detailImported}件 / 支援金${supportImported}件 / 準備金${reserveImported}件`;
@@ -480,16 +481,55 @@ function markRecordsAsSynced(storeName, records) {
   });
 }
 
+function loadMonthlyCache() {
+  try {
+    const raw = localStorage.getItem(MONTHLY_CACHE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    console.error("月次キャッシュ読込エラー:", error);
+    return {};
+  }
+}
+
+function saveMonthlyCache(cacheObject) {
+  try {
+    localStorage.setItem(MONTHLY_CACHE_STORAGE_KEY, JSON.stringify(cacheObject));
+  } catch (error) {
+    console.error("月次キャッシュ保存エラー:", error);
+  }
+}
+
+function getCachedMonthlyData(targetMonth) {
+  const cache = loadMonthlyCache();
+  return cache[targetMonth] || null;
+}
+
+function setCachedMonthlyData(targetMonth, data) {
+  const cache = loadMonthlyCache();
+  cache[targetMonth] = {
+    ...data,
+    cached_at: new Date().toISOString(),
+  };
+  saveMonthlyCache(cache);
+}
+
 async function fetchMonthlyFinancials(targetMonth) {
   const savedUrl = loadSavedSyncBaseUrl();
+  const cachedData = getCachedMonthlyData(targetMonth);
+
   if (!savedUrl) {
-    return {
-      card: null,
-      support: null,
-      reserve: null,
-      balance: null,
-      cardBreakdown: [],
-    };
+    return cachedData
+      ? { ...cachedData, source: "cache" }
+      : {
+          card: null,
+          support: null,
+          reserve: null,
+          balance: null,
+          cardBreakdown: [],
+          source: "none",
+        };
   }
 
   try {
@@ -500,52 +540,63 @@ async function fetchMonthlyFinancials(targetMonth) {
     const responseJson = await response.json();
 
     if (!response.ok || !responseJson?.ok) {
-      return {
-        card: null,
-        support: null,
-        reserve: null,
-        balance: null,
-        cardBreakdown: [],
-      };
+      throw new Error(responseJson?.message || "月次取得失敗");
     }
 
-    return {
-      card: responseJson.card,
-      support: responseJson.support,
-      reserve: responseJson.reserve,
-      balance: responseJson.balance,
+    const freshData = {
+      card: responseJson.card ?? null,
+      support: responseJson.support ?? null,
+      reserve: responseJson.reserve ?? null,
+      balance: responseJson.balance ?? null,
       cardBreakdown: Array.isArray(responseJson.card_breakdown)
         ? responseJson.card_breakdown
         : [],
     };
+
+    setCachedMonthlyData(targetMonth, freshData);
+    return { ...freshData, source: "server" };
   } catch (error) {
     console.error("月次集計取得エラー:", error);
+    if (cachedData) {
+      return { ...cachedData, source: "cache" };
+    }
     return {
       card: null,
       support: null,
       reserve: null,
       balance: null,
       cardBreakdown: [],
+      source: "none",
     };
   }
 }
 
 async function fetchMonthlyOptions() {
   const savedUrl = loadSavedSyncBaseUrl();
-  if (!savedUrl) return [];
+  const cachedMonths = Object.keys(loadMonthlyCache()).sort().reverse();
+
+  if (!savedUrl) {
+    return cachedMonths.map((month) => ({
+      sheet_name: month.replace("20", "").replace("-", "."),
+      target_month: month,
+    }));
+  }
 
   try {
     const response = await fetch(`${savedUrl}/months?ts=${Date.now()}`, { cache: "no-store" });
     const responseJson = await response.json();
 
     if (!response.ok || !responseJson?.ok || !Array.isArray(responseJson.months)) {
-      return [];
+      throw new Error("月一覧取得失敗");
     }
 
     return responseJson.months;
   } catch (error) {
     console.error("月一覧取得エラー:", error);
-    return [];
+    return cachedMonths.map((month) => ({
+      sheet_name: month.replace("20", "").replace("-", "."),
+      target_month: month,
+    }));
   }
 }
 
@@ -567,7 +618,8 @@ function saveSyncBaseUrl(url) {
 }
 
 function loadSavedSyncBaseUrl() {
-  return normalizeSyncBaseUrl(localStorage.getItem(SYNC_URL_STORAGE_KEY) || "");
+  const value = localStorage.getItem(SYNC_URL_STORAGE_KEY);
+  return normalizeSyncBaseUrl(value || "");
 }
 
 function initializeDatabase() {
@@ -981,7 +1033,7 @@ async function renderMonthlyTargetMonthOptions() {
   }
 }
 
-async function renderMonthlySummary() {
+async function renderMonthlySummary(forceServerFetch = false) {
   const monthSelect = document.getElementById("monthly-target-month");
   if (!monthSelect) return;
 
@@ -1007,7 +1059,9 @@ async function renderMonthlySummary() {
     return;
   }
 
-  const financials = await fetchMonthlyFinancials(targetMonth);
+  const financials = forceServerFetch
+    ? await fetchMonthlyFinancials(targetMonth)
+    : await fetchMonthlyFinancials(targetMonth);
 
   updateMonthlySummaryDisplay({
     detailTotal: financials.card,
@@ -1040,6 +1094,15 @@ async function renderMonthlySummary() {
       ? []
       : [{ target_purpose: "親ファイル集計", reserve_amount: financials.reserve }]
   );
+
+  const syncStatus = document.getElementById("sync-url-status");
+  if (syncStatus) {
+    if (financials.source === "cache") {
+      syncStatus.textContent = "月次閲覧は保存済みデータを表示中です。";
+    } else if (financials.source === "server") {
+      syncStatus.textContent = "月次閲覧は同期サーバーの最新データです。";
+    }
+  }
 }
 
 function renderMonthlyCardBreakdown(cardBreakdown) {
