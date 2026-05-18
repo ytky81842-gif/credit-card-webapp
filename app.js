@@ -10,6 +10,7 @@ let db = null;
 let budgetCategories = [];
 let cardNames = [];
 let parentDetailOptions = [];
+let masterCardRules = {};
 let isParentRefreshRunning = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -202,6 +203,7 @@ async function loadMasterOptions() {
   if (!savedUrl) {
     cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾンゴールド", "JAL", "NL"];
     budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
+    masterCardRules = buildDefaultMasterRules(cardNames);
     return;
   }
 
@@ -225,10 +227,52 @@ async function loadMasterOptions() {
     if (budgetCategories.length === 0) {
       budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
     }
+
+    masterCardRules = await loadMasterCardRulesFromServer(savedUrl, cardNames);
   } catch (error) {
     console.error("マスタ読込エラー:", error);
     cardNames = ["Epos", "ANA Pay", "UFJ", "Olive", "Amazon", "セゾンゴールド", "JAL", "NL"];
     budgetCategories = ["食費", "光熱費", "交通費", "娯楽費", "雑費", "不加算"];
+    masterCardRules = buildDefaultMasterRules(cardNames);
+  }
+}
+
+function buildDefaultMasterRules(cardNameList) {
+  const rules = {};
+  cardNameList.forEach((cardName) => {
+    rules[cardName] = {
+      closing_day: 15,
+      payment_month_offset: 1,
+      include_in_card_total: cardName === "ANA Pay" ? false : true,
+    };
+  });
+  return rules;
+}
+
+async function loadMasterCardRulesFromServer(savedUrl, fallbackCardNames) {
+  try {
+    const response = await fetch(`${savedUrl}/master?ts=${Date.now()}`, { cache: "no-store" });
+    const responseJson = await response.json();
+
+    const rules = buildDefaultMasterRules(fallbackCardNames);
+
+    if (Array.isArray(responseJson.card_rules)) {
+      responseJson.card_rules.forEach((item) => {
+        const cardName = String(item.card_name || "").trim();
+        if (!cardName) return;
+        rules[cardName] = {
+          closing_day: Number(item.closing_day || 15),
+          payment_month_offset: Number(item.payment_month_offset || 1),
+          include_in_card_total:
+            item.include_in_card_total === false ? false : true,
+        };
+      });
+    }
+
+    return rules;
+  } catch (error) {
+    console.error("カードルール読込失敗:", error);
+    return buildDefaultMasterRules(fallbackCardNames);
   }
 }
 
@@ -748,15 +792,17 @@ function setupDetailForm() {
       if (!db) throw new Error("DBが初期化されていません。");
 
       const formData = new FormData(detailForm);
+      const useDate = String(formData.get("useDate") || "").trim();
+      const cardName = String(formData.get("cardName") || "").trim();
 
       const detailRecord = {
         detail_id: createRecordId("detail"),
-        target_month: normalizeTargetMonth(formData.get("useDate")),
-        use_date: String(formData.get("useDate") || "").trim(),
+        target_month: calculateTargetMonthByCardRule(useDate, cardName),
+        use_date: useDate,
         amount: Number(normalizeMoneyInput(formData.get("amount"))),
         purpose: String(formData.get("purpose") || "").trim(),
         budget_category: String(formData.get("budgetCategory") || "").trim(),
-        card_name: String(formData.get("cardName") || "").trim(),
+        card_name: cardName,
         note: String(formData.get("note") || "").trim(),
         created_at: new Date().toISOString(),
         synced: false,
@@ -786,6 +832,52 @@ function setupDetailForm() {
       alert(`保存失敗の詳細: ${error.message}`);
     }
   });
+}
+
+function calculateTargetMonthByCardRule(useDate, cardName) {
+  const normalizedDate = String(useDate || "").trim();
+  const normalizedCard = String(cardName || "").trim();
+
+  if (!normalizedDate) return "";
+  if (!normalizedCard) return "";
+
+  const parts = normalizedDate.split("-");
+  if (parts.length !== 3) return "";
+
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+
+  if (!year || !month || !day) return "";
+
+  const rule = masterCardRules[normalizedCard] || {
+    closing_day: 15,
+    payment_month_offset: 1,
+  };
+
+  const closingDay = Number(rule.closing_day || 15);
+  const paymentMonthOffset = Number(rule.payment_month_offset || 1);
+
+  let closingYear = year;
+  let closingMonth = month;
+
+  if (day > closingDay) {
+    closingMonth += 1;
+    if (closingMonth > 12) {
+      closingMonth = 1;
+      closingYear += 1;
+    }
+  }
+
+  let targetYear = closingYear;
+  let targetMonth = closingMonth + paymentMonthOffset;
+
+  while (targetMonth > 12) {
+    targetMonth -= 12;
+    targetYear += 1;
+  }
+
+  return `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
 }
 
 function setupSupportForm() {
@@ -1204,15 +1296,13 @@ function updateMonthlyCountDisplay(counts) {
   document.getElementById("monthly-reserve-count").textContent = String(counts.reserveCount);
 }
 
-function normalizeTargetMonth(dateValue) {
-  const text = String(dateValue || "").trim();
-  if (!text) return "";
-  const parts = text.split("-");
-  if (parts.length !== 3) return "";
-  const year = parts[0];
-  const month = parts[1];
-  if (year.length !== 4 || month.length !== 2) return "";
-  return `${year}-${month}`;
+function normalizeMoneyInput(value) {
+  const halfWidthValue = String(value)
+    .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 65248))
+    .replace(/，/g, ",")
+    .replace(/．/g, ".");
+
+  return halfWidthValue.replace(/[^\d]/g, "");
 }
 
 function validateDetailRecord(detailRecord) {
@@ -1222,7 +1312,7 @@ function validateDetailRecord(detailRecord) {
   if (!detailRecord.purpose) return "利用用途を入力してください。";
   if (!detailRecord.budget_category) return "予算分類を選択してください。";
   if (!detailRecord.card_name) return "利用カードを選択してください。";
-  if (!detailRecord.target_month) return "利用日から対象月を作成できませんでした。";
+  if (!detailRecord.target_month) return "対象月を作成できませんでした。";
   return "";
 }
 
